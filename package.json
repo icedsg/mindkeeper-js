@@ -1,0 +1,31 @@
+{
+  "name": "mindkeeper-map",
+  "version": "1.0.0",
+  "description": "Standalone interactive mind map renderer for the web. Zero dependencies, single JS file, full CRUD API.",
+  "main": "src/mindkeeper-map.js",
+  "files": [
+    "src/mindkeeper-map.js",
+    "src/types.ts"
+  ],
+  "keywords": [
+    "mindmap",
+    "mind-map",
+    "visualization",
+    "svg",
+    "interactive",
+    "tree",
+    "diagram",
+    "canvas",
+    "export"
+  ],
+  "author": "icedsg",
+  "license": "MIT",
+  "homepage": "https://icedsg.github.io/mindkeeper-js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/icedsg/mindkeeper-js.git"
+  },
+  "bugs": {
+    "url": "https://github.com/icedsg/mindkeeper-js/issues"
+  }
+}

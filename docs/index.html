@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>mindkeeper-map.js — Interactive Mind Map Library</title>
+  <meta name="description" content="Zero-dependency JavaScript library for building interactive mind maps on the web. SVG rendering, full CRUD API, PNG/SVG export." />
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+
+<!-- ── Nav ─────────────────────────────────────────────────────────────────── -->
+<nav>
+  <div class="container nav-inner">
+    <a class="nav-logo" href="#">
+      <span style="font-size:1.2rem;">🧠</span>
+      mindkeeper-<span class="logo-accent">map</span>.js
+    </a>
+    <div class="nav-links">
+      <a href="#demo">Demo</a>
+      <a href="#install">Install</a>
+      <a href="#api">API</a>
+      <a href="https://github.com/icedsg/mindkeeper-js" target="_blank" rel="noopener">GitHub</a>
+      <a href="https://www.npmjs.com/package/mindkeeper-map" target="_blank" rel="noopener" class="btn btn-outline btn-sm">npm</a>
+    </div>
+  </div>
+</nav>
+
+<!-- ── Hero ─────────────────────────────────────────────────────────────────── -->
+<section class="hero">
+  <span class="hero-badge">Open Source · MIT · Zero deps</span>
+  <h1>Build interactive<br><span class="grad">mind maps</span><br>on the web</h1>
+  <p>Drop in one JS file. Full CRUD API, SVG rendering, drag &amp; drop, pan, zoom, and lossless PNG/SVG export — no build step required.</p>
+  <div class="hero-actions">
+    <a class="btn btn-primary" href="#demo">Live Demo</a>
+    <a class="btn btn-outline" href="https://github.com/icedsg/mindkeeper-js" target="_blank" rel="noopener">GitHub</a>
+    <a class="btn btn-outline" href="https://www.npmjs.com/package/mindkeeper-map" target="_blank" rel="noopener">npm</a>
+  </div>
+  <div class="badges">
+    <img alt="npm version" src="https://img.shields.io/npm/v/mindkeeper-map?style=flat-square&color=58a6ff" />
+    <img alt="license" src="https://img.shields.io/badge/license-MIT-green?style=flat-square" />
+    <img alt="no dependencies" src="https://img.shields.io/badge/dependencies-0-brightgreen?style=flat-square" />
+    <img alt="bundle size" src="https://img.shields.io/bundlephobia/minzip/mindkeeper-map?style=flat-square&label=minzipped" />
+  </div>
+</section>
+
+<!-- ── Live Demo ─────────────────────────────────────────────────────────────── -->
+<section id="demo">
+  <div class="container">
+    <p class="section-label">Try It</p>
+    <h2 class="section-title">Live Demo</h2>
+    <p class="section-sub">Click any node to select it. Use the panel below to add children, rename, or delete. Scroll to zoom, drag background to pan.</p>
+
+    <div class="demo-toolbar" style="margin-top:32px;">
+      <button class="btn btn-outline btn-sm" id="btn-fit">&#8645; Fit</button>
+      <button class="btn btn-outline btn-sm" id="btn-export-png">&#x1F4F7; PNG</button>
+      <button class="btn btn-outline btn-sm" id="btn-export-svg">&#x2193; SVG</button>
+      <button class="btn btn-outline btn-sm" id="btn-reset">&#8635; Reset</button>
+    </div>
+
+    <div id="mm-container"></div>
+
+    <!-- Node action panel -->
+    <div class="node-panel" id="node-panel">
+      <div class="node-panel-header">
+        <div class="dot"></div>
+        <span class="panel-topic" id="panel-topic">No node selected</span>
+        <span class="panel-id" id="panel-id"></span>
+      </div>
+      <div id="panel-no-sel" class="panel-no-selection">Click any node in the map above to see actions.</div>
+      <div id="panel-actions" style="display:none;">
+        <div class="node-panel-body">
+          <div class="panel-row">
+            <input id="input-add" type="text" placeholder="Child node label…" />
+            <button class="btn btn-outline btn-sm" id="btn-add-child">Add Child</button>
+          </div>
+          <div class="panel-row">
+            <input id="input-rename" type="text" placeholder="New label…" />
+            <button class="btn btn-outline btn-sm" id="btn-rename">Rename</button>
+          </div>
+          <button class="btn btn-danger btn-sm" id="btn-delete">Delete Node</button>
+        </div>
+        <p class="panel-hint">Click the background to deselect &nbsp;·&nbsp; Drag any node to reposition it</p>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ── Features ──────────────────────────────────────────────────────────────── -->
+<section id="features">
+  <div class="container">
+    <p class="section-label">Features</p>
+    <h2 class="section-title">Everything you need</h2>
+    <p class="section-sub">A complete mind map solution in a single file. No bundler, no framework, no dependencies.</p>
+
+    <div class="features-grid">
+      <div class="feature-card">
+        <span class="feature-icon">🖼️</span>
+        <h3>SVG Rendering</h3>
+        <p>Pure SVG — crisp at any resolution, no canvas artifacts. Drop-shadow filters, colour-coded branches, smooth bezier links.</p>
+      </div>
+      <div class="feature-card">
+        <span class="feature-icon">🖱️</span>
+        <h3>Interactive Canvas</h3>
+        <p>Drag individual nodes. Pan by dragging the background. Scroll-wheel zoom centred on the cursor. Pinch-to-zoom on touch.</p>
+      </div>
+      <div class="feature-card">
+        <span class="feature-icon">✏️</span>
+        <h3>Full CRUD API</h3>
+        <p>Add, update, delete nodes programmatically. Insert a node between any two connected nodes without breaking the tree.</p>
+      </div>
+      <div class="feature-card">
+        <span class="feature-icon">📤</span>
+        <h3>Export PNG &amp; SVG</h3>
+        <p>One-line export to high-DPI PNG or vector SVG. The export is pixel-perfect — no dependencies, pure web platform APIs.</p>
+      </div>
+      <div class="feature-card">
+        <span class="feature-icon">🔄</span>
+        <h3>JSON Import / Export</h3>
+        <p>Load any tree as JSON with <code>fromJSON()</code>. Snapshot the current state with <code>toJSON()</code> and save or share it.</p>
+      </div>
+      <div class="feature-card">
+        <span class="feature-icon">📡</span>
+        <h3>Event System</h3>
+        <p>Subscribe to <code>nodeClick</code>, <code>nodeAdd</code>, <code>nodeUpdate</code>, and <code>nodeDelete</code> to build reactive UIs on top.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Install ───────────────────────────────────────────────────────────────── -->
+<section id="install">
+  <div class="container">
+    <p class="section-label">Get Started</p>
+    <h2 class="section-title">Install</h2>
+    <p class="section-sub">Two ways to add mindkeeper-map.js to your project.</p>
+
+    <div class="install-grid">
+      <div class="install-card">
+        <div class="install-card-header">
+          <div class="step-badge">1</div>
+          CDN (no build step)
+        </div>
+        <pre><code><span class="tok-cmt">&lt;!-- Drop this in your HTML --&gt;</span>
+&lt;<span class="tok-tag">script</span> <span class="tok-flag">src</span>=<span class="tok-str">"https://cdn.jsdelivr.net/npm/mindkeeper-map/src/mindkeeper-map.js"</span>&gt;&lt;/<span class="tok-tag">script</span>&gt;
+
+<span class="tok-cmt">&lt;!-- Create a container --&gt;</span>
+&lt;<span class="tok-tag">div</span> <span class="tok-flag">id</span>=<span class="tok-str">"map"</span> <span class="tok-flag">style</span>=<span class="tok-str">"width:100%;height:500px"</span>&gt;&lt;/<span class="tok-tag">div</span>&gt;
+
+<span class="tok-cmt">&lt;!-- Initialise --&gt;</span>
+&lt;<span class="tok-tag">script</span>&gt;
+<span class="tok-key">const</span> map = <span class="tok-key">new</span> MindkeeperMap(<span class="tok-str">'#map'</span>);
+map.<span class="tok-tag">init</span>({ topic: <span class="tok-str">'Root'</span>, children: [] });
+&lt;/<span class="tok-tag">script</span>&gt;</code></pre>
+      </div>
+
+      <div class="install-card">
+        <div class="install-card-header">
+          <div class="step-badge">2</div>
+          npm
+        </div>
+        <pre><code><span class="tok-cmt"># Install</span>
+<span class="tok-cmd">npm install</span> mindkeeper-map
+
+<span class="tok-cmt">// CommonJS</span>
+<span class="tok-key">const</span> MindkeeperMap = <span class="tok-tag">require</span>(<span class="tok-str">'mindkeeper-map'</span>);
+
+<span class="tok-cmt">// Or copy the file directly from</span>
+<span class="tok-cmt">// node_modules/mindkeeper-map/src/mindkeeper-map.js</span>
+
+<span class="tok-cmt">// Initialise</span>
+<span class="tok-key">const</span> map = <span class="tok-key">new</span> MindkeeperMap(<span class="tok-str">'#map'</span>);
+map.<span class="tok-tag">init</span>(treeData);</code></pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── API Reference ─────────────────────────────────────────────────────────── -->
+<section id="api">
+  <div class="container">
+    <p class="section-label">API</p>
+    <h2 class="section-title">API Reference</h2>
+    <p class="section-sub">All methods return <code>this</code> unless noted, so they chain.</p>
+
+    <div class="api-grid">
+
+      <div class="api-card">
+        <div class="api-card-header">new MindkeeperMap(selector, options?)</div>
+        <div class="api-card-body">
+          <p>Create an instance. <code>selector</code> is a CSS selector string or an Element. All options are optional:</p>
+          <pre><code>{
+  levelWidth: <span class="tok-num">240</span>,   <span class="tok-cmt">// px between depth levels</span>
+  vSpacing:   <span class="tok-num">54</span>,    <span class="tok-cmt">// px between siblings</span>
+  linkStroke: <span class="tok-num">3</span>,     <span class="tok-cmt">// link line width</span>
+  nodeBorder: <span class="tok-num">2.5</span>,   <span class="tok-cmt">// node border width</span>
+  fontFamily: <span class="tok-str">'system-ui'</span>
+}</code></pre>
+        </div>
+      </div>
+
+      <div class="api-card">
+        <div class="api-card-header">.init(data) → this</div>
+        <div class="api-card-body">
+          <p>Render the map from a tree object. Ids are optional — any node without one gets a stable auto-generated id.</p>
+          <pre><code>map.init({
+  id: <span class="tok-str">'root'</span>,
+  topic: <span class="tok-str">'My Mind'</span>,
+  children: [
+    { topic: <span class="tok-str">'Work'</span>, children: [
+      { topic: <span class="tok-str">'Q3 launch'</span> }
+    ]},
+    { topic: <span class="tok-str">'Personal'</span> }
+  ]
+});</code></pre>
+        </div>
+      </div>
+
+      <div class="api-card">
+        <div class="api-card-header">.addNode(parentId, { topic }) → string</div>
+        <div class="api-card-body">
+          <p>Add a child node to the given parent. Returns the new node's id.</p>
+          <pre><code><span class="tok-key">const</span> id = map.<span class="tok-tag">addNode</span>(<span class="tok-str">'root'</span>, {
+  topic: <span class="tok-str">'New branch'</span>
+});</code></pre>
+        </div>
+      </div>
+
+      <div class="api-card">
+        <div class="api-card-header">.insertBetween(parentId, childId, { topic }) → string</div>
+        <div class="api-card-body">
+          <p>Insert a new node between a parent and one of its children. The existing child becomes a child of the new node.</p>
+          <pre><code><span class="tok-cmt">// Before: Root → Work</span>
+<span class="tok-key">const</span> id = map.<span class="tok-tag">insertBetween</span>(
+  <span class="tok-str">'root'</span>, <span class="tok-str">'work'</span>,
+  { topic: <span class="tok-str">'Category'</span> }
+);
+<span class="tok-cmt">// After:  Root → Category → Work</span></code></pre>
+        </div>
+      </div>
+
+      <div class="api-card">
+        <div class="api-card-header">.updateNode(id, { topic }) → this</div>
+        <div class="api-card-body">
+          <p>Update a node's label. The map re-renders automatically.</p>
+          <pre><code>map.<span class="tok-tag">updateNode</span>(id, { topic: <span class="tok-str">'New label'</span> });</code></pre>
+        </div>
+      </div>
+
+      <div class="api-card">
+        <div class="api-card-header">.deleteNode(id) → this</div>
+        <div class="api-card-body">
+          <p>Delete a node and all its descendants. Cannot delete the root node.</p>
+          <pre><code>map.<span class="tok-tag">deleteNode</span>(id);</code></pre>
+        </div>
+      </div>
+
+      <div class="api-card">
+        <div class="api-card-header">.getNode(id) → object | null</div>
+        <div class="api-card-body">
+          <p>Returns lightweight node info: <code>{ id, topic, children: string[] }</code>.</p>
+          <pre><code><span class="tok-key">const</span> node = map.<span class="tok-tag">getNode</span>(<span class="tok-str">'work'</span>);
+<span class="tok-cmt">// { id: 'work', topic: 'Work',</span>
+<span class="tok-cmt">//   children: ['q3', 'team'] }</span></code></pre>
+        </div>
+      </div>
+
+      <div class="api-card">
+        <div class="api-card-header">.fromJSON(data) / .toJSON() → object</div>
+        <div class="api-card-body">
+          <p><code>fromJSON</code> is an alias for <code>init</code>. <code>toJSON</code> returns the current tree as a plain JS object you can serialise.</p>
+          <pre><code><span class="tok-key">const</span> json = map.<span class="tok-tag">toJSON</span>();
+localStorage.<span class="tok-tag">setItem</span>(<span class="tok-str">'map'</span>, JSON.<span class="tok-tag">stringify</span>(json));
+
+map.<span class="tok-tag">fromJSON</span>(JSON.<span class="tok-tag">parse</span>(saved));</code></pre>
+        </div>
+      </div>
+
+      <div class="api-card">
+        <div class="api-card-header">.exportPNG(filename?) / .exportSVG(filename?)</div>
+        <div class="api-card-body">
+          <p>Download the full mindmap as a high-DPI PNG or a clean vector SVG. No dependencies — built on <code>XMLSerializer</code> and <code>Canvas 2D</code>.</p>
+          <pre><code>map.<span class="tok-tag">exportPNG</span>(<span class="tok-str">'my-map.png'</span>);
+map.<span class="tok-tag">exportSVG</span>(<span class="tok-str">'my-map.svg'</span>);</code></pre>
+        </div>
+      </div>
+
+      <div class="api-card">
+        <div class="api-card-header">.on(event, handler) / .off(event, handler)</div>
+        <div class="api-card-body">
+          <p>Subscribe and unsubscribe from events. Returns <code>this</code> for chaining.</p>
+          <pre><code>map
+  .<span class="tok-tag">on</span>(<span class="tok-str">'nodeClick'</span>, ({ id, topic }) =&gt; {
+    console.<span class="tok-tag">log</span>(<span class="tok-str">'Clicked:'</span>, topic);
+  })
+  .<span class="tok-tag">on</span>(<span class="tok-str">'nodeAdd'</span>, ({ node, parentId }) =&gt; {
+    save(map.<span class="tok-tag">toJSON</span>());
+  });</code></pre>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Events table -->
+    <h3 style="margin-top:48px;margin-bottom:0;font-size:1.1rem;">Events</h3>
+    <table class="events-table">
+      <thead>
+        <tr>
+          <th>Event</th>
+          <th>Payload</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>nodeClick</td>
+          <td>{ id, topic }</td>
+          <td>A node was clicked</td>
+        </tr>
+        <tr>
+          <td>nodeAdd</td>
+          <td>{ node: { id, topic }, parentId }</td>
+          <td>A node was added via <code>addNode</code> or <code>insertBetween</code></td>
+        </tr>
+        <tr>
+          <td>nodeUpdate</td>
+          <td>{ id, data }</td>
+          <td>A node was updated via <code>updateNode</code></td>
+        </tr>
+        <tr>
+          <td>nodeDelete</td>
+          <td>{ id }</td>
+          <td>A node was deleted via <code>deleteNode</code></td>
+        </tr>
+        <tr>
+          <td>nodeDeselect</td>
+          <td>{}</td>
+          <td>The background was clicked, clearing selection</td>
+        </tr>
+      </tbody>
+    </table>
+
+  </div>
+</section>
+
+<!-- ── JSON Format ────────────────────────────────────────────────────────────── -->
+<section id="format">
+  <div class="container">
+    <p class="section-label">Data</p>
+    <h2 class="section-title">JSON Format</h2>
+    <p class="section-sub">The input and output format is a recursive tree. The <code>id</code> field is optional on input — the library generates stable ids for any node that omits it.</p>
+
+    <div class="json-example">
+      <div>
+        <pre><code>{
+  <span class="tok-key">"id"</span>: <span class="tok-str">"root"</span>,
+  <span class="tok-key">"topic"</span>: <span class="tok-str">"Project Plan"</span>,
+  <span class="tok-key">"children"</span>: [
+    {
+      <span class="tok-key">"id"</span>: <span class="tok-str">"design"</span>,
+      <span class="tok-key">"topic"</span>: <span class="tok-str">"Design"</span>,
+      <span class="tok-key">"children"</span>: [
+        { <span class="tok-key">"topic"</span>: <span class="tok-str">"Wireframes"</span> },
+        { <span class="tok-key">"topic"</span>: <span class="tok-str">"Prototype"</span> }
+      ]
+    },
+    {
+      <span class="tok-key">"id"</span>: <span class="tok-str">"dev"</span>,
+      <span class="tok-key">"topic"</span>: <span class="tok-str">"Development"</span>,
+      <span class="tok-key">"children"</span>: [
+        { <span class="tok-key">"topic"</span>: <span class="tok-str">"API"</span> },
+        { <span class="tok-key">"topic"</span>: <span class="tok-str">"Frontend"</span> }
+      ]
+    }
+  ]
+}</code></pre>
+      </div>
+      <div>
+        <div class="feature-card" style="margin-bottom:16px;">
+          <span class="feature-icon">💡</span>
+          <h3>Works with mindkeeper-mcp</h3>
+          <p>Export your mind map from the <a href="https://www.npmjs.com/package/mindkeeper-mcp" target="_blank" rel="noopener">mindkeeper-mcp</a> CLI or MCP server (<code>~/.mindkeeper/mindmap.json</code>) and pass it directly to <code>fromJSON()</code>.</p>
+        </div>
+        <div class="feature-card">
+          <span class="feature-icon">💾</span>
+          <h3>Persist to localStorage</h3>
+          <p>Call <code>toJSON()</code> after any mutation to snapshot the tree and save it wherever you need — <code>localStorage</code>, a database, or a file.</p>
+          <pre><code>map.on('nodeAdd', () =>
+  localStorage.setItem(
+    'map',
+    JSON.stringify(map.toJSON())
+  )
+);</code></pre>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Footer ────────────────────────────────────────────────────────────────── -->
+<footer>
+  <div class="container footer-inner">
+    <p>Built by <a href="https://github.com/icedsg" target="_blank" rel="noopener">icedsg</a> &nbsp;·&nbsp; MIT License &nbsp;·&nbsp; No dependencies</p>
+    <div class="footer-links">
+      <a href="https://github.com/icedsg/mindkeeper-js" target="_blank" rel="noopener">GitHub</a>
+      <a href="https://www.npmjs.com/package/mindkeeper-map" target="_blank" rel="noopener">npm</a>
+      <a href="https://www.npmjs.com/package/mindkeeper-mcp" target="_blank" rel="noopener">mindkeeper-mcp</a>
+    </div>
+  </div>
+</footer>
+
+<!-- ── Scripts ────────────────────────────────────────────────────────────────── -->
+<script src="./mindkeeper-map.js"></script>
+<script>
+/* ── Demo data: Alex's Mind ── */
+var DEMO_DATA = {
+  id: 'root',
+  topic: "Alex's Mind",
+  children: [
+    {
+      id: 'work',
+      topic: 'Work',
+      children: [
+        { id: 'q3', topic: 'Q3 Launch', children: [
+          { topic: 'Define specs' },
+          { topic: 'UI mockups' },
+          { topic: 'Beta users' }
+        ]},
+        { id: 'team', topic: 'Team', children: [
+          { topic: 'Friday demos' },
+          { topic: 'Async docs' },
+          { topic: '1:1 cadence' }
+        ]},
+        { id: 'skills', topic: 'Skills', children: [
+          { topic: 'System design' },
+          { topic: 'Leadership' }
+        ]}
+      ]
+    },
+    {
+      id: 'personal',
+      topic: 'Personal',
+      children: [
+        { id: 'health', topic: 'Health', children: [
+          { topic: 'Morning yoga' },
+          { topic: '10k weekly' },
+          { topic: 'Meal prep' }
+        ]},
+        { id: 'travel', topic: 'Travel', children: [
+          { topic: 'Japan — Oct' },
+          { topic: 'Weekend hike' }
+        ]},
+        { id: 'creative', topic: 'Creative', children: [
+          { topic: 'Guitar' },
+          { topic: 'Photography' }
+        ]}
+      ]
+    },
+    {
+      id: 'reading',
+      topic: 'Reading',
+      children: [
+        { id: 'now', topic: 'Now Reading', children: [
+          { topic: 'Thinking F&S' },
+          { topic: 'Clean Code' }
+        ]},
+        { id: 'queue', topic: 'Queue', children: [
+          { topic: 'Atomic Habits' },
+          { topic: 'DDIA' },
+          { topic: 'Lean Startup' }
+        ]},
+        { id: 'done', topic: 'Finished', children: [
+          { topic: 'Deep Work' },
+          { topic: 'Pragmatic Prog.' }
+        ]}
+      ]
+    },
+    {
+      id: 'ideas',
+      topic: 'Ideas',
+      children: [
+        { id: 'side', topic: 'Side Projects', children: [
+          { topic: 'mindkeeper-map' },
+          { topic: 'AI note tool' }
+        ]},
+        { id: 'biz', topic: 'Business', children: [
+          { topic: 'Dev SaaS' },
+          { topic: 'Freelancer hub' }
+        ]}
+      ]
+    }
+  ]
+};
+
+/* ── Map instance ── */
+var map = new MindkeeperMap('#mm-container');
+map.init(DEMO_DATA);
+
+/* ── Node panel ── */
+var panel      = document.getElementById('node-panel');
+var panelTopic = document.getElementById('panel-topic');
+var panelId    = document.getElementById('panel-id');
+var panelNoSel = document.getElementById('panel-no-sel');
+var panelActs  = document.getElementById('panel-actions');
+var inputAdd   = document.getElementById('input-add');
+var inputRen   = document.getElementById('input-rename');
+
+var currentId = null;
+
+function showPanel(id, topic) {
+  currentId = id;
+  panelTopic.textContent = topic;
+  panelId.textContent = id;
+  panelNoSel.style.display = 'none';
+  panelActs.style.display = 'block';
+  inputRen.value = topic;
+  inputAdd.value = '';
+  panel.classList.add('has-selection');
+}
+
+function hidePanel() {
+  currentId = null;
+  panelTopic.textContent = 'No node selected';
+  panelId.textContent = '';
+  panelNoSel.style.display = '';
+  panelActs.style.display = 'none';
+  panel.classList.remove('has-selection');
+}
+
+map.on('nodeClick', function (e) { showPanel(e.id, e.topic); });
+map.on('nodeDeselect', hidePanel);
+
+/* Add child */
+document.getElementById('btn-add-child').addEventListener('click', function () {
+  if (!currentId) { return; }
+  var label = inputAdd.value.trim();
+  if (!label) { inputAdd.focus(); return; }
+  map.addNode(currentId, { topic: label });
+  inputAdd.value = '';
+  inputAdd.focus();
+});
+inputAdd.addEventListener('keydown', function (e) {
+  if (e.key === 'Enter') { document.getElementById('btn-add-child').click(); }
+});
+
+/* Rename */
+document.getElementById('btn-rename').addEventListener('click', function () {
+  if (!currentId) { return; }
+  var label = inputRen.value.trim();
+  if (!label) { inputRen.focus(); return; }
+  map.updateNode(currentId, { topic: label });
+  var node = map.getNode(currentId);
+  if (node) { showPanel(currentId, node.topic); }
+});
+inputRen.addEventListener('keydown', function (e) {
+  if (e.key === 'Enter') { document.getElementById('btn-rename').click(); }
+});
+
+/* Delete */
+document.getElementById('btn-delete').addEventListener('click', function () {
+  if (!currentId) { return; }
+  if (currentId === 'root') { alert('Cannot delete the root node.'); return; }
+  try {
+    map.deleteNode(currentId);
+    hidePanel();
+  } catch (err) {
+    alert(err.message);
+  }
+});
+
+/* Toolbar */
+document.getElementById('btn-fit').addEventListener('click', function () { map.fit(); });
+document.getElementById('btn-export-png').addEventListener('click', function () { map.exportPNG('alexs-mind.png'); });
+document.getElementById('btn-export-svg').addEventListener('click', function () { map.exportSVG('alexs-mind.svg'); });
+document.getElementById('btn-reset').addEventListener('click', function () {
+  map.fromJSON(DEMO_DATA);
+  hidePanel();
+});
+</script>
+
+</body>
+</html>

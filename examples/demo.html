@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>mindkeeper-js — Interactive Demo</title>
+  <meta name="description" content="Interactive mindmap demo for mindkeeper-js — see the MindkeeperMap library in action." />
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    #mindmap-canvas { cursor: grab; }
+    #mindmap-canvas:active { cursor: grabbing; }
+    .node circle {
+      stroke-width: 2;
+      transition: r 0.15s;
+    }
+    .node text {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: 12px;
+      fill: #e6edf3;
+      pointer-events: none;
+      user-select: none;
+    }
+    .link {
+      fill: none;
+      stroke: #30363d;
+      stroke-width: 1.5;
+    }
+    .node--root circle { r: 20; }
+
+    #mkmap-demo { width: 100%; height: 520px; background: var(--bg); }
+  </style>
+</head>
+<body>
+
+<!-- ── Nav ── -->
+<nav>
+  <div class="container nav-inner">
+    <a class="nav-logo" href="#">
+      🧠 <span>mindkeeper</span>-js
+    </a>
+    <div class="nav-links">
+      <a href="visualize.html">Visualize</a>
+      <a href="demo.html" style="color: var(--accent);">Demo</a>
+    </div>
+  </div>
+</nav>
+
+<!-- ── Hero ── -->
+<section style="padding: 48px 0 0;">
+  <div class="container">
+    <p class="section-label">Interactive Demo</p>
+    <h2 class="section-title">MindkeeperMap in action</h2>
+    <p class="section-sub">
+      A live mindmap rendered with mindkeeper-map.js. Drag nodes to reposition. Scroll to zoom. Pan by dragging the background.
+    </p>
+  </div>
+</section>
+
+<!-- ── MindkeeperMap Demo ── -->
+<section style="padding-top: 32px;">
+  <div class="container">
+
+    <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;">
+      <button class="btn btn-primary" id="btn-export-png">Export PNG</button>
+      <button class="btn btn-outline" id="btn-export-svg">Export SVG</button>
+    </div>
+
+    <div id="mkmap-demo"></div>
+
+    <div style="margin-top:24px;">
+      <div class="demo-panel">
+        <div class="panel-header">
+          <div class="dot"></div>
+          Usage — mindkeeper-map.js
+        </div>
+        <div class="panel-body">
+          <pre><code><span class="tok-cmt">// 1. Include the script</span>
+&lt;script src="mindkeeper-map.js"&gt;&lt;/script&gt;
+
+<span class="tok-cmt">// 2. Create a container</span>
+&lt;div id="container" style="width:100%;height:500px;"&gt;&lt;/div&gt;
+
+<span class="tok-cmt">// 3. Initialize with tree data</span>
+<span class="tok-key">const</span> map = <span class="tok-tag">new</span> MindkeeperMap(<span class="tok-str">'#container'</span>);
+map.<span class="tok-tag">init</span>({
+  topic: <span class="tok-str">'Root'</span>,
+  children: [
+    { topic: <span class="tok-str">'Branch A'</span>, children: [{ topic: <span class="tok-str">'Leaf'</span> }] },
+    { topic: <span class="tok-str">'Branch B'</span> },
+  ]
+});
+
+<span class="tok-cmt">// 4. Export</span>
+map.<span class="tok-tag">exportPNG</span>(<span class="tok-str">'mindmap.png'</span>);
+map.<span class="tok-tag">exportSVG</span>(<span class="tok-str">'mindmap.svg'</span>);</code></pre>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ── Footer ── -->
+<footer>
+  <div class="container footer-inner">
+    <p>Built by <a href="https://github.com/icedsg" target="_blank" rel="noopener">icedsg</a> · MIT License</p>
+    <div class="footer-links">
+      <a href="https://github.com/icedsg/mindkeeper-mcp" target="_blank" rel="noopener">GitHub</a>
+      <a href="visualize.html">Visualize</a>
+    </div>
+  </div>
+</footer>
+
+<script src="../src/mindkeeper-map.js"></script>
+<script>
+const SAMPLE_TREE = {
+  topic: 'Product Strategy',
+  children: [
+    {
+      topic: 'Ship v2 by Q3',
+      children: [
+        { topic: 'EU market expansion' },
+        { topic: 'API v2 design', children: [{ topic: 'GraphQL schema review' }] },
+      ]
+    },
+    { topic: 'Hire backend engineer' },
+    {
+      topic: 'Reduce infra costs',
+      children: [{ topic: 'Migrate to spot instances' }]
+    },
+    { topic: 'Mobile app redesign' },
+  ]
+};
+
+const map = new MindkeeperMap('#mkmap-demo');
+map.init(SAMPLE_TREE);
+
+document.getElementById('btn-export-png').addEventListener('click', () => map.exportPNG('demo-mindmap.png'));
+document.getElementById('btn-export-svg').addEventListener('click', () => map.exportSVG('demo-mindmap.svg'));
+</script>
+
+</body>
+</html>
