@@ -1,326 +1,465 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Visualize — mindkeeper-js</title>
-  <meta name="description" content="Import your mindmap.json and explore it as an interactive mindmap — all in the browser." />
-  <link rel="stylesheet" href="style.css" />
-  <style>
-    /* ── Drop zone layout ── */
-    #dropzone-section {
-      min-height: calc(100vh - 56px);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 48px 24px;
-    }
-    .import-layout {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 48px;
-      max-width: 960px;
-      width: 100%;
-      align-items: center;
-    }
-    @media (max-width: 720px) {
-      .import-layout { grid-template-columns: 1fr; gap: 32px; }
-    }
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Visualize — mindkeeper-map js</title>
+    <meta
+      name="description"
+      content="Import your mindmap.json and explore it as an interactive mindmap — all in the browser."
+    />
+    <link rel="stylesheet" href="style.css" />
+    <style>
+      /* ── Drop zone layout ── */
+      #dropzone-section {
+        min-height: calc(100vh - 56px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 48px 24px;
+      }
+      .import-layout {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 48px;
+        max-width: 960px;
+        width: 100%;
+        align-items: center;
+      }
+      @media (max-width: 720px) {
+        .import-layout {
+          grid-template-columns: 1fr;
+          gap: 32px;
+        }
+      }
 
-    /* ── Instructions ── */
-    .import-guide h2 { font-size: 1.3rem; margin-bottom: 24px; }
-    .guide-step {
-      display: flex;
-      gap: 14px;
-      margin-bottom: 24px;
-    }
-    .step-num {
-      flex-shrink: 0;
-      width: 28px;
-      height: 28px;
-      border-radius: 50%;
-      background: var(--accent);
-      color: #fff;
-      font-size: 0.8rem;
-      font-weight: 700;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin-top: 2px;
-    }
-    .guide-step strong { display: block; margin-bottom: 6px; font-size: 0.95rem; }
-    .guide-step p { color: var(--text-muted); font-size: 0.875rem; margin-bottom: 8px; }
-    .path-block {
-      background: var(--bg-alt);
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      padding: 8px 12px;
-      font-family: var(--mono);
-      font-size: 0.82rem;
-      color: var(--green);
-      margin-bottom: 6px;
-    }
-    .os-hints { display: flex; flex-direction: column; gap: 3px; margin-top: 6px; }
-    .os-hints span { font-size: 0.78rem; color: var(--text-muted); }
-    .os-hints code { color: var(--orange); font-family: var(--mono); font-size: 0.78rem; }
+      /* ── Instructions ── */
+      .import-guide h2 {
+        font-size: 1.3rem;
+        margin-bottom: 24px;
+      }
+      .guide-step {
+        display: flex;
+        gap: 14px;
+        margin-bottom: 24px;
+      }
+      .step-num {
+        flex-shrink: 0;
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        background: var(--accent);
+        color: #fff;
+        font-size: 0.8rem;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-top: 2px;
+      }
+      .guide-step strong {
+        display: block;
+        margin-bottom: 6px;
+        font-size: 0.95rem;
+      }
+      .guide-step p {
+        color: var(--text-muted);
+        font-size: 0.875rem;
+        margin-bottom: 8px;
+      }
+      .path-block {
+        background: var(--bg-alt);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 8px 12px;
+        font-family: var(--mono);
+        font-size: 0.82rem;
+        color: var(--green);
+        margin-bottom: 6px;
+      }
+      .os-hints {
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+        margin-top: 6px;
+      }
+      .os-hints span {
+        font-size: 0.78rem;
+        color: var(--text-muted);
+      }
+      .os-hints code {
+        color: var(--orange);
+        font-family: var(--mono);
+        font-size: 0.78rem;
+      }
 
-    /* ── Drop area ── */
-    .drop-area {
-      border: 2px dashed var(--border);
-      border-radius: 16px;
-      padding: 48px 32px;
-      text-align: center;
-      width: 100%;
-      cursor: pointer;
-      transition: border-color 0.2s, background 0.2s;
-    }
-    .drop-area:hover, .drop-area.drag-over {
-      border-color: var(--accent);
-      background: var(--accent-glow);
-    }
-    .drop-icon { font-size: 2.5rem; margin-bottom: 14px; }
-    .drop-area h2 { font-size: 1.2rem; margin-bottom: 8px; }
-    .drop-area p { color: var(--text-muted); font-size: 0.9rem; margin-bottom: 20px; }
-    #file-input { display: none; }
-    .drop-hint { font-size: 0.78rem; color: var(--text-muted); margin-top: 10px; }
+      /* ── Drop area ── */
+      .drop-area {
+        border: 2px dashed var(--border);
+        border-radius: 16px;
+        padding: 48px 32px;
+        text-align: center;
+        width: 100%;
+        cursor: pointer;
+        transition:
+          border-color 0.2s,
+          background 0.2s;
+      }
+      .drop-area:hover,
+      .drop-area.drag-over {
+        border-color: var(--accent);
+        background: var(--accent-glow);
+      }
+      .drop-icon {
+        font-size: 2.5rem;
+        margin-bottom: 14px;
+      }
+      .drop-area h2 {
+        font-size: 1.2rem;
+        margin-bottom: 8px;
+      }
+      .drop-area p {
+        color: var(--text-muted);
+        font-size: 0.9rem;
+        margin-bottom: 20px;
+      }
+      #file-input {
+        display: none;
+      }
+      .drop-hint {
+        font-size: 0.78rem;
+        color: var(--text-muted);
+        margin-top: 10px;
+      }
 
-    /* ── Viz area ── */
-    #viz-section { display: none; flex-direction: column; height: calc(100vh - 56px); }
+      /* ── Viz area ── */
+      #viz-section {
+        display: none;
+        flex-direction: column;
+        height: calc(100vh - 56px);
+      }
 
-    .viz-toolbar {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      padding: 10px 24px;
-      background: var(--bg-alt);
-      border-bottom: 1px solid var(--border);
-      flex-wrap: wrap;
-    }
-    .viz-title { font-weight: 600; font-size: 0.95rem; margin-right: 4px; }
-    .tab {
-      padding: 6px 14px;
-      border-radius: 6px;
-      border: 1px solid var(--border);
-      background: transparent;
-      color: var(--text-muted);
-      font-size: 0.85rem;
-      cursor: pointer;
-      transition: all 0.15s;
-    }
-    .tab:hover { border-color: var(--accent); color: var(--text); }
-    .viz-stats { color: var(--text-muted); font-size: 0.82rem; margin-left: auto; }
-    #reset-btn {
-      padding: 5px 12px;
-      border-radius: 6px;
-      border: 1px solid var(--border);
-      background: transparent;
-      color: var(--text-muted);
-      font-size: 0.82rem;
-      cursor: pointer;
-    }
-    #reset-btn:hover { border-color: var(--red); color: var(--red); }
+      .viz-toolbar {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 10px 24px;
+        background: var(--bg-alt);
+        border-bottom: 1px solid var(--border);
+        flex-wrap: wrap;
+      }
+      .viz-title {
+        font-weight: 600;
+        font-size: 0.95rem;
+        margin-right: 4px;
+      }
+      .tab {
+        padding: 6px 14px;
+        border-radius: 6px;
+        border: 1px solid var(--border);
+        background: transparent;
+        color: var(--text-muted);
+        font-size: 0.85rem;
+        cursor: pointer;
+        transition: all 0.15s;
+      }
+      .tab:hover {
+        border-color: var(--accent);
+        color: var(--text);
+      }
+      .viz-stats {
+        color: var(--text-muted);
+        font-size: 0.82rem;
+        margin-left: auto;
+      }
+      #reset-btn {
+        padding: 5px 12px;
+        border-radius: 6px;
+        border: 1px solid var(--border);
+        background: transparent;
+        color: var(--text-muted);
+        font-size: 0.82rem;
+        cursor: pointer;
+      }
+      #reset-btn:hover {
+        border-color: var(--red);
+        color: var(--red);
+      }
 
-    /* ── Viz container ── */
-    #pane-mindmap { flex: 1; overflow: hidden; }
+      /* ── Viz container ── */
+      #pane-mindmap {
+        flex: 1;
+        overflow: hidden;
+      }
 
-    /* ── Error toast ── */
-    #error-toast {
-      display: none;
-      position: fixed;
-      bottom: 24px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: var(--red);
-      color: #fff;
-      padding: 10px 20px;
-      border-radius: 8px;
-      font-size: 0.9rem;
-      z-index: 999;
-    }
-  </style>
-</head>
-<body>
+      /* ── Error toast ── */
+      #error-toast {
+        display: none;
+        position: fixed;
+        bottom: 24px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: var(--red);
+        color: #fff;
+        padding: 10px 20px;
+        border-radius: 8px;
+        font-size: 0.9rem;
+        z-index: 999;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- ── Nav ── -->
+    <nav>
+      <div class="container nav-inner">
+        <a class="nav-logo" href="#">🧠 <span>mindkeeper</span>-js</a>
+        <div class="nav-links">
+          <a href="visualize.html" style="color: var(--accent)">Visualize</a>
+          <a href="demo.html">Demo</a>
+        </div>
+      </div>
+    </nav>
 
-<!-- ── Nav ── -->
-<nav>
-  <div class="container nav-inner">
-    <a class="nav-logo" href="#">🧠 <span>mindkeeper</span>-js</a>
-    <div class="nav-links">
-      <a href="visualize.html" style="color:var(--accent)">Visualize</a>
-      <a href="demo.html">Demo</a>
-    </div>
-  </div>
-</nav>
+    <!-- ── Drop zone ── -->
+    <section id="dropzone-section">
+      <div class="import-layout">
+        <!-- ── Instructions ── -->
+        <div class="import-guide">
+          <h2>How to get your mindmap file</h2>
 
-<!-- ── Drop zone ── -->
-<section id="dropzone-section">
-  <div class="import-layout">
+          <div class="guide-step">
+            <div class="step-num">1</div>
+            <div>
+              <strong>Find it directly on your filesystem</strong>
+              <p>mindkeeper saves your data locally at:</p>
+              <div class="path-block">~/.mindkeeper/mindmap.json</div>
+              <div class="os-hints">
+                <span
+                  >Mac — Finder: <code>Cmd+Shift+G</code>, paste the path
+                  above</span
+                >
+                <span
+                  >Windows — Explorer address bar:
+                  <code>%USERPROFILE%\.mindkeeper\mindmap.json</code></span
+                >
+                <span>Linux — <code>~/.mindkeeper/mindmap.json</code></span>
+              </div>
+            </div>
+          </div>
 
-    <!-- ── Instructions ── -->
-    <div class="import-guide">
-      <h2>How to get your mindmap file</h2>
-
-      <div class="guide-step">
-        <div class="step-num">1</div>
-        <div>
-          <strong>Find it directly on your filesystem</strong>
-          <p>mindkeeper saves your data locally at:</p>
-          <div class="path-block">~/.mindkeeper/mindmap.json</div>
-          <div class="os-hints">
-            <span>Mac — Finder: <code>Cmd+Shift+G</code>, paste the path above</span>
-            <span>Windows — Explorer address bar: <code>%USERPROFILE%\.mindkeeper\mindmap.json</code></span>
-            <span>Linux — <code>~/.mindkeeper/mindmap.json</code></span>
+          <div class="guide-step">
+            <div class="step-num">2</div>
+            <div>
+              <strong>Or pass JSON directly to the library</strong>
+              <p>Build the tree data in your app and call:</p>
+              <div class="path-block">
+                new MindkeeperMap('#container').init(treeData)
+              </div>
+            </div>
           </div>
         </div>
-      </div>
 
-      <div class="guide-step">
-        <div class="step-num">2</div>
-        <div>
-          <strong>Or pass JSON directly to the library</strong>
-          <p>Build the tree data in your app and call:</p>
-          <div class="path-block">new MindkeeperMap('#container').init(treeData)</div>
+        <!-- ── Drop area ── -->
+        <div class="drop-area" id="drop-area">
+          <div class="drop-icon">🗺️</div>
+          <h2>Import your mindmap</h2>
+          <p>
+            Drop <code>mindmap.json</code> here or browse to it.<br />Interactive
+            mindmap explorer, all in the browser.
+          </p>
+          <label
+            class="btn btn-primary"
+            for="file-input"
+            style="
+              display: inline-flex;
+              align-items: center;
+              gap: 8px;
+              cursor: pointer;
+            "
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+              <path
+                d="M2.75 14A1.75 1.75 0 0 1 1 12.25v-2.5a.75.75 0 0 1 1.5 0v2.5c0 .138.112.25.25.25h10.5a.25.25 0 0 0 .25-.25v-2.5a.75.75 0 0 1 1.5 0v2.5A1.75 1.75 0 0 1 13.25 14Z"
+              />
+              <path
+                d="M7.25 7.689V2a.75.75 0 0 1 1.5 0v5.689l1.97-1.97a.749.749 0 1 1 1.06 1.06l-3.25 3.25a.749.749 0 0 1-1.06 0L4.22 6.779a.749.749 0 1 1 1.06-1.06l1.97 1.97Z"
+              />
+            </svg>
+            Browse file
+          </label>
+          <input type="file" id="file-input" accept=".json,application/json" />
+          <p class="drop-hint">
+            Your file never leaves your browser — all rendering is client-side.
+          </p>
         </div>
       </div>
-    </div>
+    </section>
 
-    <!-- ── Drop area ── -->
-    <div class="drop-area" id="drop-area">
-      <div class="drop-icon">🗺️</div>
-      <h2>Import your mindmap</h2>
-      <p>Drop <code>mindmap.json</code> here or browse to it.<br>Interactive mindmap explorer, all in the browser.</p>
-      <label class="btn btn-primary" for="file-input" style="display:inline-flex;align-items:center;gap:8px;cursor:pointer;">
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M2.75 14A1.75 1.75 0 0 1 1 12.25v-2.5a.75.75 0 0 1 1.5 0v2.5c0 .138.112.25.25.25h10.5a.25.25 0 0 0 .25-.25v-2.5a.75.75 0 0 1 1.5 0v2.5A1.75 1.75 0 0 1 13.25 14Z"/><path d="M7.25 7.689V2a.75.75 0 0 1 1.5 0v5.689l1.97-1.97a.749.749 0 1 1 1.06 1.06l-3.25 3.25a.749.749 0 0 1-1.06 0L4.22 6.779a.749.749 0 1 1 1.06-1.06l1.97 1.97Z"/></svg>
-        Browse file
-      </label>
-      <input type="file" id="file-input" accept=".json,application/json" />
-      <p class="drop-hint">Your file never leaves your browser — all rendering is client-side.</p>
-    </div>
+    <!-- ── Viz area ── -->
+    <section id="viz-section">
+      <div class="viz-toolbar">
+        <span class="viz-title">🧠 Mindmap</span>
+        <span class="viz-stats" id="viz-stats"></span>
+        <div
+          style="
+            display: flex;
+            gap: 4px;
+            align-items: center;
+            margin-left: auto;
+          "
+        >
+          <button
+            class="tab"
+            id="btn-export-png"
+            style="font-size: 0.8rem; padding: 5px 10px"
+          >
+            &#x1F4F7; PNG
+          </button>
+          <button
+            class="tab"
+            id="btn-export-svg"
+            style="font-size: 0.8rem; padding: 5px 10px"
+          >
+            &#x2193; SVG
+          </button>
+        </div>
+        <button id="reset-btn">✕ Load another</button>
+      </div>
 
-  </div>
-</section>
+      <div id="pane-mindmap">
+        <div id="mk-mindmap" style="width: 100%; height: 100%"></div>
+      </div>
+    </section>
 
-<!-- ── Viz area ── -->
-<section id="viz-section">
-  <div class="viz-toolbar">
-    <span class="viz-title">🧠 Mindmap</span>
-    <span class="viz-stats" id="viz-stats"></span>
-    <div style="display:flex;gap:4px;align-items:center;margin-left:auto;">
-      <button class="tab" id="btn-export-png" style="font-size:0.8rem;padding:5px 10px;">&#x1F4F7; PNG</button>
-      <button class="tab" id="btn-export-svg" style="font-size:0.8rem;padding:5px 10px;">&#x2193; SVG</button>
-    </div>
-    <button id="reset-btn">✕ Load another</button>
-  </div>
+    <div id="error-toast"></div>
 
-  <div id="pane-mindmap">
-    <div id="mk-mindmap" style="width:100%;height:100%;"></div>
-  </div>
-</section>
+    <script src="../src/mindkeeper-map.js"></script>
 
-<div id="error-toast"></div>
+    <script>
+      /* ── State ── */
+      let mindmapData = null;
+      let mmInstance = null;
 
-<script src="../src/mindkeeper-map.js"></script>
+      /* ── Helpers ── */
+      function showError(msg) {
+        const el = document.getElementById("error-toast");
+        el.textContent = msg;
+        el.style.display = "block";
+        setTimeout(() => {
+          el.style.display = "none";
+        }, 4000);
+      }
 
-<script>
-/* ── State ── */
-let mindmapData = null;
-let mmInstance = null;
+      /* ── File loading ── */
+      function loadJSON(file) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          try {
+            const data = JSON.parse(e.target.result);
+            if (!data.nodes || !("rootId" in data))
+              throw new Error("Not a valid mindmap.json");
+            mindmapData = data;
+            renderMindmap();
+            switchView("viz");
+          } catch (err) {
+            showError("Invalid mindmap.json: " + err.message);
+          }
+        };
+        reader.readAsText(file);
+      }
 
-/* ── Helpers ── */
-function showError(msg) {
-  const el = document.getElementById('error-toast');
-  el.textContent = msg;
-  el.style.display = 'block';
-  setTimeout(() => { el.style.display = 'none'; }, 4000);
-}
+      /* ── Drop zone ── */
+      const dropArea = document.getElementById("drop-area");
+      const fileInput = document.getElementById("file-input");
 
-/* ── File loading ── */
-function loadJSON(file) {
-  const reader = new FileReader();
-  reader.onload = e => {
-    try {
-      const data = JSON.parse(e.target.result);
-      if (!data.nodes || !('rootId' in data)) throw new Error('Not a valid mindmap.json');
-      mindmapData = data;
-      renderMindmap();
-      switchView('viz');
-    } catch (err) {
-      showError('Invalid mindmap.json: ' + err.message);
-    }
-  };
-  reader.readAsText(file);
-}
+      dropArea.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        dropArea.classList.add("drag-over");
+      });
+      dropArea.addEventListener("dragleave", () =>
+        dropArea.classList.remove("drag-over"),
+      );
+      dropArea.addEventListener("drop", (e) => {
+        e.preventDefault();
+        dropArea.classList.remove("drag-over");
+        const f = e.dataTransfer.files[0];
+        if (f) loadJSON(f);
+      });
+      fileInput.addEventListener("change", () => {
+        if (fileInput.files[0]) loadJSON(fileInput.files[0]);
+      });
 
-/* ── Drop zone ── */
-const dropArea = document.getElementById('drop-area');
-const fileInput = document.getElementById('file-input');
+      document.getElementById("reset-btn").addEventListener("click", () => {
+        mindmapData = null;
+        mmInstance = null;
+        fileInput.value = "";
+        document.getElementById("mk-mindmap").innerHTML = "";
+        switchView("drop");
+      });
 
-dropArea.addEventListener('dragover', e => { e.preventDefault(); dropArea.classList.add('drag-over'); });
-dropArea.addEventListener('dragleave', () => dropArea.classList.remove('drag-over'));
-dropArea.addEventListener('drop', e => {
-  e.preventDefault();
-  dropArea.classList.remove('drag-over');
-  const f = e.dataTransfer.files[0];
-  if (f) loadJSON(f);
-});
-fileInput.addEventListener('change', () => {
-  if (fileInput.files[0]) loadJSON(fileInput.files[0]);
-});
+      document
+        .getElementById("btn-export-png")
+        .addEventListener("click", () => {
+          if (mmInstance) mmInstance.exportPNG("mindmap.png");
+        });
+      document
+        .getElementById("btn-export-svg")
+        .addEventListener("click", () => {
+          if (mmInstance) mmInstance.exportSVG("mindmap.svg");
+        });
 
-document.getElementById('reset-btn').addEventListener('click', () => {
-  mindmapData = null;
-  mmInstance = null;
-  fileInput.value = '';
-  document.getElementById('mk-mindmap').innerHTML = '';
-  switchView('drop');
-});
+      /* ── View toggling ── */
+      function switchView(to) {
+        document.getElementById("dropzone-section").style.display =
+          to === "drop" ? "flex" : "none";
+        document.getElementById("viz-section").style.display =
+          to === "viz" ? "flex" : "none";
+      }
 
-document.getElementById('btn-export-png').addEventListener('click', () => {
-  if (mmInstance) mmInstance.exportPNG('mindmap.png');
-});
-document.getElementById('btn-export-svg').addEventListener('click', () => {
-  if (mmInstance) mmInstance.exportSVG('mindmap.svg');
-});
-
-/* ── View toggling ── */
-function switchView(to) {
-  document.getElementById('dropzone-section').style.display = to === 'drop' ? 'flex' : 'none';
-  document.getElementById('viz-section').style.display = to === 'viz' ? 'flex' : 'none';
-}
-
-/* ══════════════════════════════════════════════════════
+      /* ══════════════════════════════════════════════════════
    MINDMAP (MindkeeperMap)
 ══════════════════════════════════════════════════════ */
-function renderMindmap() {
-  const { nodes, rootId } = mindmapData;
-  const nodeCount = Object.keys(nodes).length;
-  const root = rootId ? nodes[rootId] : null;
-  document.getElementById('viz-stats').textContent =
-    `${nodeCount} node${nodeCount !== 1 ? 's' : ''}` + (root ? ` · root: "${root.text.slice(0, 40)}"` : '');
+      function renderMindmap() {
+        const { nodes, rootId } = mindmapData;
+        const nodeCount = Object.keys(nodes).length;
+        const root = rootId ? nodes[rootId] : null;
+        document.getElementById("viz-stats").textContent =
+          `${nodeCount} node${nodeCount !== 1 ? "s" : ""}` +
+          (root ? ` · root: "${root.text.slice(0, 40)}"` : "");
 
-  const rootNode = rootId ? nodes[rootId] : Object.values(nodes)[0];
-  const orphans = Object.values(nodes).filter(n => !n.parentId && n.id !== rootId);
+        const rootNode = rootId ? nodes[rootId] : Object.values(nodes)[0];
+        const orphans = Object.values(nodes).filter(
+          (n) => !n.parentId && n.id !== rootId,
+        );
 
-  function toTree(id) {
-    const n = nodes[id]; if (!n) return null;
-    const kids = (n.children || []).map(toTree).filter(Boolean);
-    const node = { id: n.id, topic: n.text };
-    if (kids.length) node.children = kids;
-    return node;
-  }
+        function toTree(id) {
+          const n = nodes[id];
+          if (!n) return null;
+          const kids = (n.children || []).map(toTree).filter(Boolean);
+          const node = { id: n.id, topic: n.text };
+          if (kids.length) node.children = kids;
+          return node;
+        }
 
-  let rootData;
-  if (!rootNode) { rootData = { topic: 'Mindkeeper (empty)', children: [] }; }
-  else if (!orphans.length) { rootData = toTree(rootNode.id); }
-  else {
-    rootData = { topic: 'Mindkeeper',
-      children: [toTree(rootNode.id), ...orphans.map(o => toTree(o.id))].filter(Boolean) };
-  }
+        let rootData;
+        if (!rootNode) {
+          rootData = { topic: "Mindkeeper (empty)", children: [] };
+        } else if (!orphans.length) {
+          rootData = toTree(rootNode.id);
+        } else {
+          rootData = {
+            topic: "Mindkeeper",
+            children: [
+              toTree(rootNode.id),
+              ...orphans.map((o) => toTree(o.id)),
+            ].filter(Boolean),
+          };
+        }
 
-  document.getElementById('mk-mindmap').innerHTML = '';
-  mmInstance = new MindkeeperMap('#mk-mindmap');
-  mmInstance.init(rootData);
-}
-</script>
-</body>
+        document.getElementById("mk-mindmap").innerHTML = "";
+        mmInstance = new MindkeeperMap("#mk-mindmap");
+        mmInstance.init(rootData);
+      }
+    </script>
+  </body>
 </html>
