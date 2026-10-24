@@ -14,7 +14,15 @@ export interface Mindmap {
 }
 
 export interface MindkeeperMapOptions {
+  /** 'mindmap' (default, branches left/right of the root) or 'orgchart' (top-down, manager above reports) */
+  layout?: 'mindmap' | 'orgchart';
   levelWidth?: number;
+  /** orgchart: distance between levels (default 110) */
+  levelHeight?: number;
+  /** orgchart: gap between sibling subtrees (default 24) */
+  hSpacing?: number;
+  /** orgchart: a manager with at least this many reports, all without reports of their own, lists them in a column (default 4, 0 = never) */
+  stackLeaves?: number;
   vSpacing?: number;
   linkStroke?: number;
   nodeBorder?: number;
@@ -28,6 +36,8 @@ export interface MindkeeperMapTreeNode {
   kind?: MindkeeperNodeKind;
   /** Optional: meta.title shows as a second line on the card */
   meta?: MindkeeperNodeMeta;
+  /** Children hidden behind a +N toggle; set by collapse()/expand()/toggle() */
+  collapsed?: boolean;
   children?: MindkeeperMapTreeNode[];
 }
 

@@ -1,5 +1,5 @@
 /*!
- * mindkeeper-map.js v1.1 — standalone interactive mindmap renderer
+ * mindkeeper-map.js v1.2 — standalone interactive mindmap / org-chart renderer
  *
  * MIT License — Copyright (c) 2025 icedsg
  * https://github.com/icedsg/mindkeeper-js
@@ -68,8 +68,18 @@
     if (node.kind) n.kind = node.kind;
     var m = cleanMeta(node.meta);
     if (m) n.meta = m;
+    if (node.collapsed) n.collapsed = true;
     if (node.children && node.children.length) n.children = node.children.map(serialize);
     return n;
+  }
+
+  // Children that are drawn: none while a node is collapsed
+  function visibleKids(node) {
+    return node.collapsed ? [] : (node.children || []);
+  }
+
+  function countDescendants(node) {
+    return (node.children || []).reduce(function (sum, c) { return sum + 1 + countDescendants(c); }, 0);
   }
 
   // ── SVG helpers ──────────────────────────────────────────────────────────────
@@ -100,7 +110,7 @@
   function assignSlots(node) {
     var counter = { n: 0 };
     function walk(n) {
-      var kids = n.children || [];
+      var kids = visibleKids(n);
       if (!kids.length) { n.slot = counter.n; counter.n += 1; return; }
       kids.forEach(walk);
       n.slot = (kids[0].slot + kids[kids.length - 1].slot) / 2;
@@ -123,7 +133,11 @@
 
     this._el   = container;
     this._opts = Object.assign({
+      layout     : 'mindmap',   // 'mindmap' (left/right of the root) or 'orgchart' (top-down)
       levelWidth : 240,
+      levelHeight: 110,         // orgchart: distance between levels
+      hSpacing   : 24,          // orgchart: gap between sibling subtrees
+      stackLeaves: 4,           // orgchart: a manager with this many reports, all leaves, lists them in a column (0 = never)
       vSpacing   : 54,
       linkStroke : 3,
       nodeBorder : 2.5,
@@ -248,6 +262,28 @@
     return newNode.id;
   };
 
+  // Switch between 'mindmap' and 'orgchart' and refit
+  MindkeeperMap.prototype.setLayout = function (name) {
+    if (name !== 'mindmap' && name !== 'orgchart') throw new Error('setLayout: unknown layout — ' + name);
+    this._opts.layout = name;
+    this._refresh();
+    if (this._svg) this._fit();
+    return this;
+  };
+
+  // Hide / show a node's descendants (kept as `collapsed: true` in toJSON)
+  MindkeeperMap.prototype.collapse = function (id) { return this._setCollapsed(id, true); };
+  MindkeeperMap.prototype.expand   = function (id) { return this._setCollapsed(id, false); };
+  MindkeeperMap.prototype.toggle   = function (id) {
+    var found = this._findInTree(id);
+    if (!found) throw new Error('toggle: node not found — ' + id);
+    return this._setCollapsed(id, !found.node.collapsed);
+  };
+
+  // Open every branch, or close every branch below the root
+  MindkeeperMap.prototype.expandAll   = function () { return this._setAll(false); };
+  MindkeeperMap.prototype.collapseAll = function () { return this._setAll(true); };
+
   // Fit the mindmap to the container
   MindkeeperMap.prototype.fit = function () {
     this._fit();
@@ -278,6 +314,29 @@
     if (!node.id) node.id = genId();
     if (node.children) node.children.forEach(this._ensureIds.bind(this));
     return node;
+  };
+
+  MindkeeperMap.prototype._setCollapsed = function (id, on) {
+    var found = this._findInTree(id);
+    if (!found) throw new Error('collapse: node not found — ' + id);
+    if (!!found.node.collapsed === on) return this;
+    if (on) found.node.collapsed = true; else delete found.node.collapsed;
+    this._refresh();
+    this._emit('nodeToggle', { id: id, collapsed: on });
+    return this;
+  };
+
+  MindkeeperMap.prototype._setAll = function (on) {
+    var root = this._data;
+    if (!root) return this;
+    (function walk(n) {
+      if (on && n !== root && n.children && n.children.length) n.collapsed = true;
+      else delete n.collapsed;
+      (n.children || []).forEach(walk);
+    })(root);
+    this._refresh();
+    if (this._svg) this._fit();
+    return this;
   };
 
   // kind: a string sets it, null/'' removes it. meta: keys merge in, null/'' removes a key, meta: null clears it.
@@ -353,6 +412,7 @@
   // ── Layout ───────────────────────────────────────────────────────────────────
 
   MindkeeperMap.prototype._layout = function (data) {
+    if (this._opts.layout === 'orgchart') return this._layoutOrg(data);
     this._nodes = []; this._links = [];
     var opts = this._opts;
     var W  = this._el.clientWidth  || 800;
@@ -370,9 +430,10 @@
       style: ROOT_STYLE, parent: null, isRoot: true,
     };
     this._typeCard(rootNode, data, 15, true);
+    this._markToggle(rootNode, data);
     this._nodes.push(rootNode);
 
-    var allKids   = data.children || [];
+    var allKids   = visibleKids(data);
     var rightKids = allKids.filter(function (_, i) { return i % 2 === 0; });
     var leftKids  = allKids.filter(function (_, i) { return i % 2 !== 0; });
 
@@ -402,9 +463,10 @@
           parent: parentNode,
         };
         self._typeCard(nd, node, fs, bold);
+        self._markToggle(nd, node);
         self._nodes.push(nd);
         if (parentNode) self._links.push({ source: parentNode, target: nd });
-        (node.children || []).forEach(function (child) { place(child, depth + 1, nd, bIdx); });
+        visibleKids(node).forEach(function (child) { place(child, depth + 1, nd, bIdx); });
       }
 
       kids.forEach(function (kid, i) { place(kid, 1, rootNode, bOff + i); });
@@ -412,6 +474,87 @@
 
     layoutSide(rightKids, false);
     layoutSide(leftKids, true);
+  };
+
+  // Org chart: top-down tidy tree. Each subtree is as wide as its widest row and a manager sits centred over
+  // their reports; a manager whose reports are all leaves (at least stackLeaves of them) lists them in a column.
+  MindkeeperMap.prototype._layoutOrg = function (data) {
+    this._nodes = []; this._links = [];
+    var opts = this._opts;
+    var W = this._el.clientWidth || 800;
+    var self = this;
+    var gap = opts.hSpacing, indent = 22, stackGap = 12;
+
+    // Pass 1: card sizes and subtree widths
+    function measure(node, depth, bIdx) {
+      var isRoot = depth === 0;
+      var bold = depth <= 1, fs = isRoot ? 15 : depth === 1 ? 13 : 12;
+      var label = self._trunc(String(node.topic || (isRoot ? 'Root' : '')), isRoot ? 32 : 30);
+      var nd = {
+        id: node.id, topic: label, cx: 0, cy: 0,
+        w: isRoot ? Math.max(measureText(label, fs, true) + 44, 110)
+                  : Math.max(measureText(label, fs, bold) + (depth <= 1 ? 32 : 24), 72),
+        h: isRoot ? 42 : depth <= 1 ? 36 : 30,
+        depth: depth, isLeft: false, branchIdx: bIdx,
+        style: isRoot ? ROOT_STYLE : PALETTE[bIdx % PALETTE.length],
+        parent: null,
+      };
+      if (isRoot) nd.isRoot = true;
+      self._typeCard(nd, node, fs, bold);
+      self._markToggle(nd, node);
+      nd.kids = visibleKids(node).map(function (c, i) { return measure(c, depth + 1, isRoot ? i : bIdx); });
+      nd.kids.forEach(function (k) { k.parent = nd; });
+      nd.stacked = opts.stackLeaves > 0 && !isRoot && nd.kids.length >= opts.stackLeaves &&
+        nd.kids.every(function (k) { return !k.hasToggle; });
+      if (nd.stacked) {
+        nd.colW = Math.max.apply(null, nd.kids.map(function (k) { return k.w; }));
+        nd.span = Math.max(nd.w, nd.colW + indent * 2);
+      } else if (nd.kids.length) {
+        nd.row = nd.kids.reduce(function (s, k) { return s + k.span; }, 0) + gap * (nd.kids.length - 1);
+        nd.span = Math.max(nd.w, nd.row);
+      } else {
+        nd.span = nd.w;
+      }
+      return nd;
+    }
+
+    // Pass 2: positions; every level starts levelHeight below the one above
+    function place(nd, left, top) {
+      nd.cx = left + nd.span / 2;
+      nd.cy = top + nd.h / 2;
+      self._nodes.push(nd);
+      if (nd.stacked) {
+        var colLeft = nd.cx - nd.colW / 2 + indent / 2;
+        var y = top + nd.h + (nd.hasToggle ? 30 : 16);
+        nd.kids.forEach(function (k) {
+          k.cx = colLeft + k.w / 2; k.cy = y + k.h / 2; y += k.h + stackGap;
+          self._nodes.push(k);
+          self._links.push({ source: nd, target: k, kind: 'stack', spineX: colLeft - indent / 2 - 4 });
+        });
+      } else if (nd.kids.length) {
+        var x = nd.cx - nd.row / 2;
+        nd.kids.forEach(function (k) {
+          place(k, x, top + opts.levelHeight);
+          self._links.push({ source: nd, target: k, kind: 'elbow' });
+          x += k.span + gap;
+        });
+        // Centre over the first and last report rather than the whole row, staying inside the subtree
+        var mid = (nd.kids[0].cx + nd.kids[nd.kids.length - 1].cx) / 2;
+        nd.cx = Math.min(Math.max(mid, left + nd.w / 2), left + nd.span - nd.w / 2);
+      }
+      delete nd.kids; delete nd.row; delete nd.colW;
+    }
+
+    var root = measure(data, 0, -1);
+    place(root, W / 2 - root.span / 2, 40);
+  };
+
+  // A node with children gets a +/- toggle; a collapsed one shows how many are hidden
+  MindkeeperMap.prototype._markToggle = function (nd, node) {
+    if (!node.children || !node.children.length) return;
+    nd.hasToggle = true;
+    nd.collapsed = !!node.collapsed;
+    if (nd.collapsed) nd.hidden = countDescendants(node);
   };
 
   // Typed / titled nodes: kind colours, badge room and a second line for meta.title.
@@ -466,6 +609,7 @@
   };
 
   MindkeeperMap.prototype._drawLink = function (lk) {
+    if (lk.kind) return this._drawOrgLink(lk);
     var s = lk.source, t = lk.target;
     var isLeft = t.isLeft;
     var sx = isLeft ? s.cx - s.w / 2 : s.cx + s.w / 2;
@@ -481,6 +625,27 @@
       'stroke-width': this._opts.linkStroke,
       'stroke-linecap': 'round',
       opacity: '0.82',
+    });
+    lk._el = path;
+    this._linksG.appendChild(path);
+  };
+
+  // Org chart links: elbow from the manager's bottom edge to the report's top edge, or a spine for stacked reports
+  MindkeeperMap.prototype._drawOrgLink = function (lk) {
+    var s = lk.source, t = lk.target, d;
+    var sy = s.cy + s.h / 2 + (s.hasToggle ? 18 : 0);
+    if (lk.kind === 'stack') {
+      d = 'M' + s.cx + ',' + sy + ' V' + (sy + 4) + ' H' + lk.spineX + ' V' + t.cy + ' H' + (t.cx - t.w / 2);
+    } else {
+      var ty = t.cy - t.h / 2, my = (sy + ty) / 2;
+      d = 'M' + s.cx + ',' + sy + ' V' + my + ' H' + t.cx + ' V' + ty;
+    }
+    var path = svgEl('path', {
+      d: d, fill: 'none',
+      stroke: t.style.stroke,
+      'stroke-width': Math.max(1.5, this._opts.linkStroke - 1),
+      'stroke-linejoin': 'round', 'stroke-linecap': 'round',
+      opacity: '0.7',
     });
     lk._el = path;
     this._linksG.appendChild(path);
@@ -547,6 +712,9 @@
       nd._parts.push({ el: sub, dx: tdx, dy: 9 });
     }
 
+    // Org charts show every branch toggle; the mind map only marks collapsed nodes
+    if (nd.hasToggle && (opts.layout === 'orgchart' || nd.collapsed)) this._drawToggle(nd, g);
+
     g.addEventListener('mouseenter', function () {
       rect.setAttribute('filter', 'url(#mkmap-sh-hov)');
       rect.setAttribute('stroke-width', opts.nodeBorder + 1.5);
@@ -565,6 +733,39 @@
     nd._el = g;
     this._nodesG.appendChild(g);
     this._bindDrag(nd);
+  };
+
+  // +/- button on the card edge (below it in org charts, outer side in the mind map); collapsed shows +N
+  MindkeeperMap.prototype._drawToggle = function (nd, g) {
+    var self = this, opts = this._opts;
+    var org = opts.layout === 'orgchart';
+    var label = nd.collapsed ? '+' + nd.hidden : '\u2212';
+    var r = label.length > 2 ? 11 : 9;
+    var dx = org ? 0 : (nd.isLeft ? -nd.w / 2 - r - 3 : nd.w / 2 + r + 3);
+    var dy = org ? nd.h / 2 + r : 0;
+    var tg = svgEl('g', { 'class': 'mkmap-toggle' });
+    tg.style.cursor = 'pointer';
+    var c = svgEl('circle', {
+      cx: nd.cx + dx, cy: nd.cy + dy, r: r,
+      fill: '#ffffff', stroke: nd.style.stroke, 'stroke-width': 1.5,
+    });
+    var t = svgEl('text', {
+      x: nd.cx + dx, y: nd.cy + dy,
+      'text-anchor': 'middle', 'dominant-baseline': 'central',
+      'font-family': opts.fontFamily, 'font-size': label.length > 2 ? 9 : 11, 'font-weight': '700',
+      fill: nd.style.text, 'pointer-events': 'none',
+    });
+    t.textContent = label;
+    tg.appendChild(c); tg.appendChild(t);
+    nd._parts.push({ el: c, dx: dx, dy: dy, xAttr: 'cx', yAttr: 'cy' });
+    nd._parts.push({ el: t, dx: dx, dy: dy });
+    tg.addEventListener('mousedown', function (e) { e.stopPropagation(); });
+    tg.addEventListener('touchstart', function (e) { e.stopPropagation(); }, { passive: true });
+    tg.addEventListener('click', function (e) {
+      e.stopPropagation();
+      self.toggle(nd.id);
+    });
+    g.appendChild(tg);
   };
 
   // Kind badge on the left of the card: a glyph / initials circle, or the avatar image
@@ -863,6 +1064,7 @@
   MindkeeperMap.KINDS = KINDS;
   MindkeeperMap.META_KEYS = META_KEYS;
   MindkeeperMap.serialize = serialize;
+  MindkeeperMap.LAYOUTS = ['mindmap', 'orgchart'];
 
   // ── Expose ───────────────────────────────────────────────────────────────────
 

@@ -121,4 +121,100 @@ test('addNode / updateNode / insertBetween carry kind + meta', function () {
   assert.deepStrictEqual(map.getNode(mid).children, ['eng']);
 });
 
+// ── Org-chart layout ─────────────────────────────────────────────────────────
+
+function loadOrg(data, opts) {
+  var map = new MindkeeperMap({ clientWidth: 1000, clientHeight: 700 }, Object.assign({ layout: 'orgchart' }, opts));
+  map._data = map._ensureIds(JSON.parse(JSON.stringify(data)));
+  map._layout(map._data);
+  return map;
+}
+function person(id, kids) {
+  return { id: id, topic: 'Person ' + id, kind: 'person', meta: { title: 'Title of ' + id }, children: kids || [] };
+}
+var company = {
+  id: 'co', topic: 'Sample Co', kind: 'company', children: [
+    person('ceo', [
+      person('cto', [person('e1'), person('e2'), person('e3'), person('e4'), person('e5')]),
+      person('cfo', [person('a1'), person('a2')]),
+      person('coo', [person('m1', [person('w1'), person('w2')]), person('m2')])
+    ])
+  ]
+};
+
+function overlaps(a, b) {
+  return Math.abs(a.cx - b.cx) * 2 < a.w + b.w && Math.abs(a.cy - b.cy) * 2 < a.h + b.h;
+}
+
+test('orgchart: managers sit above their reports, no cards overlap', function () {
+  var map = loadOrg(company);
+  assert.strictEqual(map._nodes.length, 16);
+  map._nodes.forEach(function (n) {
+    if (n.parent) assert.ok(n.cy > n.parent.cy, n.id + ' is not below ' + n.parent.id);
+  });
+  for (var i = 0; i < map._nodes.length; i++)
+    for (var j = i + 1; j < map._nodes.length; j++)
+      assert.ok(!overlaps(map._nodes[i], map._nodes[j]), map._nodes[i].id + ' overlaps ' + map._nodes[j].id);
+});
+
+test('orgchart: a manager is centred over a row of reports', function () {
+  var map = loadOrg(company);
+  var ceo = node(map, 'ceo'), cto = node(map, 'cto'), coo = node(map, 'coo');
+  assert.ok(Math.abs(ceo.cx - (cto.cx + coo.cx) / 2) < 0.001);
+  assert.strictEqual(node(map, 'cfo').cy, cto.cy, 'siblings share a row');
+  assert.ok(cto.cx < node(map, 'cfo').cx && node(map, 'cfo').cx < coo.cx, 'sibling order kept');
+  assert.ok(map._links.every(function (l) { return l.kind === 'elbow' || l.kind === 'stack'; }));
+});
+
+test('orgchart: 4+ leaf reports stack in a column, fewer stay in a row', function () {
+  var map = loadOrg(company);
+  var es = ['e1', 'e2', 'e3', 'e4', 'e5'].map(function (id) { return node(map, id); });
+  es.forEach(function (e, i) {
+    assert.strictEqual(e.cx - e.w / 2, es[0].cx - es[0].w / 2, 'column left edge');
+    if (i) assert.ok(e.cy > es[i - 1].cy);
+  });
+  assert.strictEqual(node(map, 'a1').cy, node(map, 'a2').cy);
+  // m1 has reports of its own, so coo's reports stay in a row
+  assert.strictEqual(node(map, 'm1').cy, node(map, 'm2').cy);
+  // stackLeaves: 0 turns stacking off
+  var flat = loadOrg(company, { stackLeaves: 0 });
+  assert.strictEqual(node(flat, 'e1').cy, node(flat, 'e5').cy);
+});
+
+test('collapse hides descendants, keeps toJSON round-trip, expand restores', function () {
+  var map = loadOrg(company);
+  var toggles = [];
+  map.on('nodeToggle', function (e) { toggles.push(e); });
+  map.collapse('cto');
+  assert.strictEqual(node(map, 'e1'), undefined);
+  assert.strictEqual(node(map, 'cto').collapsed, true);
+  assert.strictEqual(node(map, 'cto').hidden, 5);
+  assert.strictEqual(map._nodes.length, 11);
+  assert.strictEqual(map.toJSON().children[0].children[0].collapsed, true);
+  assert.deepStrictEqual(toggles, [{ id: 'cto', collapsed: true }]);
+  assert.strictEqual(loadOrg(map.toJSON())._nodes.length, 11, 'collapsed state survives reload');
+
+  map.toggle('cto');
+  assert.strictEqual(map._nodes.length, 16);
+  assert.strictEqual(map.toJSON().children[0].children[0].collapsed, undefined);
+
+  map.collapseAll();
+  assert.deepStrictEqual(map._nodes.map(function (n) { return n.id; }), ['co', 'ceo']);
+  map.expandAll();
+  assert.strictEqual(map._nodes.length, 16);
+});
+
+test('collapse works in the mind-map layout too; setLayout switches', function () {
+  var map = load(company);
+  map.collapse('coo');
+  assert.strictEqual(node(map, 'w1'), undefined);
+  assert.ok(node(map, 'coo').hasToggle && node(map, 'coo').collapsed);
+  map.expand('coo');
+  assert.strictEqual(map._nodes.length, 16);
+  assert.ok(node(map, 'ceo').cx > node(map, 'co').cx, 'mind map grows sideways');
+  map.setLayout('orgchart');
+  assert.ok(node(map, 'ceo').cy > node(map, 'co').cy, 'org chart grows down');
+  assert.throws(function () { map.setLayout('radial'); });
+});
+
 console.log('\n' + passed + ' passed' + (process.exitCode ? ', some FAILED' : ''));
