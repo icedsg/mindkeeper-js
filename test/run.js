@@ -217,4 +217,114 @@ test('collapse works in the mind-map layout too; setLayout switches', function (
   assert.throws(function () { map.setLayout('radial'); });
 });
 
+// ── Cross-links + diff ───────────────────────────────────────────────────────
+
+var legacyLinks = [{ from: legacyTree.id, to: legacyTree.children[0].id, type: 'see also' }];
+var portfolio = JSON.parse(JSON.stringify(company));
+portfolio.children.push({ id: 'apollo', topic: 'Apollo', kind: 'project' });
+portfolio.links = [
+  { from: 'e1', to: 'apollo', type: 'works on' },
+  { from: 'a1', to: 'cto', type: 'dotted', label: 'dotted line' }
+];
+
+test('links: toJSON round-trips them; maps without links stay unchanged', function () {
+  var out = loadOrg(portfolio).toJSON();
+  assert.deepStrictEqual(out.links, portfolio.links);
+  assert.deepStrictEqual(loadOrg(out).toJSON(), out);
+  assert.deepStrictEqual(load(Object.assign({ links: legacyLinks }, legacyTree)).toJSON().links, legacyLinks);
+  assert.strictEqual(load(legacyTree).toJSON().links, undefined);
+});
+
+test('links: drawn between visible cards, label defaults to the type', function () {
+  var map = loadOrg(portfolio);
+  assert.strictEqual(map._xlinks.length, 2);
+  var x = map._xlinks[0];
+  assert.strictEqual(x.source, node(map, 'e1'));
+  assert.strictEqual(x.target, node(map, 'apollo'));
+  assert.strictEqual(x.label, 'works on');
+  assert.strictEqual(map._xlinks[1].label, 'dotted line');
+  // Tree links are untouched by cross-links
+  assert.strictEqual(map._links.length, map._nodes.length - 1);
+});
+
+test('links: a collapsed end attaches to its visible ancestor; same-card links hide', function () {
+  var map = loadOrg(portfolio);
+  map.collapse('cto');
+  assert.strictEqual(map._xlinks[0].source, node(map, 'cto'));
+  assert.strictEqual(map._xlinks.length, 2);
+  map.collapse('ceo');
+  // a1 -> cto now both fold into ceo
+  assert.strictEqual(map._xlinks.length, 1);
+  assert.strictEqual(map._xlinks[0].source, node(map, 'ceo'));
+});
+
+test('addLink / removeLink / getLinks', function () {
+  var map = loadOrg(company);
+  var events = [];
+  map.on('linkAdd', function (e) { events.push('add'); });
+  map.on('linkRemove', function (e) { events.push('remove'); });
+  map.addLink('w1', 'cfo', 'mentor');
+  map.addLink('w1', 'cfo', 'mentor');
+  map.addLink('w2', 'cfo');
+  assert.deepStrictEqual(map.getLinks(), [{ from: 'w1', to: 'cfo', type: 'mentor' }, { from: 'w2', to: 'cfo' }]);
+  assert.strictEqual(map._xlinks.length, 2);
+  assert.throws(function () { map.addLink('w1', 'nobody'); });
+  map.removeLink('w1', 'cfo', 'other');
+  assert.strictEqual(map.getLinks().length, 2);
+  map.removeLink('w1', 'cfo');
+  assert.deepStrictEqual(map.toJSON().links, [{ from: 'w2', to: 'cfo' }]);
+  assert.deepStrictEqual(events, ['add', 'add', 'remove']);
+});
+
+var jan = {
+  id: 'co', topic: 'Sample Co', children: [
+    { id: 'ceo', topic: 'Ada', children: [
+      { id: 'cto', topic: 'Grace', meta: { title: 'CTO' }, children: [{ id: 'e1', topic: 'Linus' }, { id: 'e2', topic: 'Ken' }] },
+      { id: 'cfo', topic: 'Luca', children: [{ id: 'a1', topic: 'Mary' }] }
+    ] }
+  ],
+  links: [{ from: 'e1', to: 'cfo', type: 'mentor' }]
+};
+var jul = {
+  id: 'co', topic: 'Sample Co', children: [
+    { id: 'ceo', topic: 'Ada', children: [
+      { id: 'cto', topic: 'Grace', meta: { title: 'CTO & COO' }, children: [{ id: 'e1', topic: 'Linus' }, { id: 'a1', topic: 'Mary' }] },
+      { id: 'cfo', topic: 'Luca P', children: [{ id: 'n1', topic: 'Dennis' }] }
+    ] }
+  ],
+  links: [{ from: 'n1', to: 'cto', type: 'mentor' }]
+};
+
+test('diff: added / removed / moved / changed by id, links too', function () {
+  var d = MindkeeperMap.diff(jan, jul);
+  assert.deepStrictEqual(d.added, ['n1']);
+  assert.deepStrictEqual(d.removed, ['e2']);
+  assert.deepStrictEqual(d.moved, ['a1']);
+  assert.deepStrictEqual(d.changed.sort(), ['cfo', 'cto']);
+  assert.deepStrictEqual(d.info.a1, { topic: 'Mary', from: 'cfo', to: 'cto' });
+  assert.deepStrictEqual(d.info.cto.fields, ['meta']);
+  assert.deepStrictEqual(d.info.cfo.fields, ['topic']);
+  assert.strictEqual(d.info.e2.topic, 'Ken');
+  assert.deepStrictEqual(d.links.added, [{ from: 'n1', to: 'cto', type: 'mentor' }]);
+  assert.deepStrictEqual(d.links.removed, [{ from: 'e1', to: 'cfo', type: 'mentor' }]);
+  var same = MindkeeperMap.diff(jan, JSON.parse(JSON.stringify(jan)));
+  assert.ok(!same.added.length && !same.removed.length && !same.moved.length && !same.changed.length);
+});
+
+test('highlightDiff marks cards and links; clearDiff removes the marks', function () {
+  var d = MindkeeperMap.diff(jan, jul);
+  var map = loadOrg(jul);
+  map.highlightDiff(d);
+  assert.strictEqual(node(map, 'n1').diff, 'added');
+  assert.strictEqual(node(map, 'a1').diff, 'moved');
+  assert.strictEqual(node(map, 'cto').diff, 'changed');
+  assert.strictEqual(node(map, 'e1').diff, undefined);
+  assert.strictEqual(map._xlinks[0].diff, 'added');
+  // On the old tree the removed card shows red
+  var old = loadOrg(jan).highlightDiff(d);
+  assert.strictEqual(node(old, 'e2').diff, 'removed');
+  map.clearDiff();
+  assert.ok(map._nodes.every(function (n) { return n.diff === undefined; }));
+});
+
 console.log('\n' + passed + ' passed' + (process.exitCode ? ', some FAILED' : ''));

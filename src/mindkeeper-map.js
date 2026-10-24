@@ -78,6 +78,66 @@
     return node.collapsed ? [] : (node.children || []);
   }
 
+  // Cross-links between any two nodes (projects, dotted-line managers): {from, to, type?, label?}
+  function cleanLinks(links) {
+    if (!Array.isArray(links)) return [];
+    return links.filter(function (l) { return l && l.from && l.to; }).map(function (l) {
+      var o = { from: String(l.from), to: String(l.to) };
+      if (l.type) o.type = String(l.type);
+      if (l.label) o.label = String(l.label);
+      return o;
+    });
+  }
+  function linkKey(l) { return l.from + '>' + l.to + ':' + (l.type || ''); }
+
+  // Diff colours: added green, removed red, moved / changed amber (moved draws a dashed ring)
+  var DIFF = {
+    added  : { stroke: '#1F9D55', label: 'added' },
+    removed: { stroke: '#D64545', label: 'removed' },
+    moved  : { stroke: '#D99A12', label: 'moved' },
+    changed: { stroke: '#D99A12', label: 'changed' }
+  };
+
+  // Flat index of a tree: id -> { node, parentId }
+  function indexTree(root) {
+    var out = {};
+    (function walk(n, parentId) {
+      if (!n) return;
+      if (n.id) out[n.id] = { node: n, parentId: parentId };
+      (n.children || []).forEach(function (c) { walk(c, n.id || null); });
+    })(root, null);
+    return out;
+  }
+
+  // What changed between two trees (matched by id): added / removed / moved (new parent) / changed (topic, kind, meta)
+  function diffTrees(oldData, newData) {
+    var a = indexTree(oldData), b = indexTree(newData);
+    var res = { added: [], removed: [], moved: [], changed: [], links: { added: [], removed: [] }, info: {} };
+    Object.keys(b).forEach(function (id) {
+      var nb = b[id].node;
+      if (!a[id]) { res.added.push(id); res.info[id] = { topic: nb.topic }; return; }
+      var na = a[id].node, info = { topic: nb.topic };
+      if (a[id].parentId !== b[id].parentId) {
+        res.moved.push(id); info.from = a[id].parentId; info.to = b[id].parentId;
+      }
+      var fields = [];
+      if (String(na.topic) !== String(nb.topic)) fields.push('topic');
+      if ((na.kind || null) !== (nb.kind || null)) fields.push('kind');
+      if (JSON.stringify(cleanMeta(na.meta)) !== JSON.stringify(cleanMeta(nb.meta))) fields.push('meta');
+      if (fields.length) { res.changed.push(id); info.fields = fields; }
+      if (info.from !== undefined || info.fields) res.info[id] = info;
+    });
+    Object.keys(a).forEach(function (id) {
+      if (!b[id]) { res.removed.push(id); res.info[id] = { topic: a[id].node.topic }; }
+    });
+    var la = {}, lb = {};
+    cleanLinks(oldData && oldData.links).forEach(function (l) { la[linkKey(l)] = l; });
+    cleanLinks(newData && newData.links).forEach(function (l) { lb[linkKey(l)] = l; });
+    Object.keys(lb).forEach(function (k) { if (!la[k]) res.links.added.push(lb[k]); });
+    Object.keys(la).forEach(function (k) { if (!lb[k]) res.links.removed.push(la[k]); });
+    return res;
+  }
+
   function countDescendants(node) {
     return (node.children || []).reduce(function (sum, c) { return sum + 1 + countDescendants(c); }, 0);
   }
@@ -146,18 +206,23 @@
 
     this._nodes      = [];
     this._links      = [];
+    this._xlinks     = [];
+    this._diff       = null;
     this._data       = null;
     this._handlers   = {};
     this._selectedId = null;
     this._tx = 0; this._ty = 0; this._scale = 1;
-    this._svg = null; this._mainG = null; this._linksG = null; this._nodesG = null;
+    this._svg = null; this._mainG = null; this._linksG = null; this._xlinksG = null; this._nodesG = null;
+    this._legend = null;
   }
 
   // ── Public API ───────────────────────────────────────────────────────────────
 
   MindkeeperMap.prototype.init = function (data) {
     this._data = this._ensureIds(JSON.parse(JSON.stringify(data)));
+    this._data.links = cleanLinks(this._data.links);
     this._selectedId = null;
+    this._diff = null;
     this._setup();
     var self = this;
     function tryInit() {
@@ -179,8 +244,49 @@
   // Export current tree as a plain JS object
   MindkeeperMap.prototype.toJSON = function () {
     if (!this._data) return null;
-    return serialize(this._data);
+    var out = serialize(this._data);
+    if (this._data.links && this._data.links.length) out.links = cleanLinks(this._data.links);
+    return out;
   };
+
+  // Cross-links: dashed labelled curves between any two nodes, outside the tree (e.g. person -> project)
+  MindkeeperMap.prototype.getLinks = function () {
+    return cleanLinks(this._data && this._data.links);
+  };
+
+  MindkeeperMap.prototype.addLink = function (from, to, type, label) {
+    if (!this._findInTree(from)) throw new Error('addLink: node not found — ' + from);
+    if (!this._findInTree(to)) throw new Error('addLink: node not found — ' + to);
+    var link = cleanLinks([{ from: from, to: to, type: type, label: label }])[0];
+    var links = this._data.links || (this._data.links = []);
+    if (links.some(function (l) { return linkKey(l) === linkKey(link); })) return this;
+    links.push(link);
+    this._refresh();
+    this._emit('linkAdd', { link: link });
+    return this;
+  };
+
+  // Removes from -> to links (only those of `type` when given)
+  MindkeeperMap.prototype.removeLink = function (from, to, type) {
+    var links = (this._data && this._data.links) || [];
+    var keep = links.filter(function (l) {
+      return !(l.from === from && l.to === to && (type === undefined || (l.type || '') === (type || '')));
+    });
+    if (keep.length === links.length) return this;
+    this._data.links = keep;
+    this._refresh();
+    this._emit('linkRemove', { from: from, to: to, type: type });
+    return this;
+  };
+
+  // Mark the result of MindkeeperMap.diff() on the cards (green added, red removed, amber moved/changed) with a legend
+  MindkeeperMap.prototype.highlightDiff = function (diff) {
+    this._diff = diff || null;
+    this._refresh();
+    return this;
+  };
+
+  MindkeeperMap.prototype.clearDiff = function () { return this.highlightDiff(null); };
 
   // Return lightweight info for a single node
   MindkeeperMap.prototype.getNode = function (id) {
@@ -316,6 +422,35 @@
     return node;
   };
 
+  // After a layout: diff marks on the cards, and cross-links between drawn cards.
+  // A link end hidden in a collapsed branch attaches to its nearest visible ancestor.
+  MindkeeperMap.prototype._decorate = function (data) {
+    var byId = {}, diff = this._diff, self = this;
+    this._nodes.forEach(function (nd) { byId[nd.id] = nd; });
+    if (diff) {
+      ['changed', 'moved', 'removed', 'added'].forEach(function (k) {
+        (diff[k] || []).forEach(function (id) { if (byId[id]) byId[id].diff = k; });
+      });
+    }
+    var shown = {};
+    (function walk(n, vis) {
+      var here = byId[n.id] ? byId[n.id] : vis;
+      shown[n.id] = here;
+      (n.children || []).forEach(function (c) { walk(c, here); });
+    })(data, null);
+    this._xlinks = [];
+    cleanLinks(data.links).forEach(function (l) {
+      var s = shown[l.from], t = shown[l.to];
+      if (!s || !t || s === t) return;
+      var xl = { source: s, target: t, type: l.type || null, label: l.label || l.type || null };
+      if (diff && diff.links) {
+        if ((diff.links.added || []).some(function (d) { return linkKey(d) === linkKey(l); })) xl.diff = 'added';
+        else if ((diff.links.removed || []).some(function (d) { return linkKey(d) === linkKey(l); })) xl.diff = 'removed';
+      }
+      self._xlinks.push(xl);
+    });
+  };
+
   MindkeeperMap.prototype._setCollapsed = function (id, on) {
     var found = this._findInTree(id);
     if (!found) throw new Error('collapse: node not found — ' + id);
@@ -373,6 +508,9 @@
   MindkeeperMap.prototype._setup = function () {
     var prev = this._el.querySelector('svg.mkmap');
     if (prev) prev.parentNode.removeChild(prev);
+    var prevLegend = this._el.querySelector('.mkmap-legend');
+    if (prevLegend) prevLegend.parentNode.removeChild(prevLegend);
+    this._legend = null;
 
     this._el.style.cssText += ';position:relative;overflow:hidden;';
 
@@ -397,9 +535,11 @@
     svg.appendChild(bg);
 
     var main = svgEl('g', { 'class': 'mkmap-main' });
-    this._linksG = svgEl('g', { 'class': 'mkmap-links' });
-    this._nodesG = svgEl('g', { 'class': 'mkmap-nodes' });
+    this._linksG  = svgEl('g', { 'class': 'mkmap-links' });
+    this._xlinksG = svgEl('g', { 'class': 'mkmap-xlinks' });
+    this._nodesG  = svgEl('g', { 'class': 'mkmap-nodes' });
     main.appendChild(this._linksG);
+    main.appendChild(this._xlinksG);
     main.appendChild(this._nodesG);
     svg.appendChild(main);
 
@@ -412,7 +552,12 @@
   // ── Layout ───────────────────────────────────────────────────────────────────
 
   MindkeeperMap.prototype._layout = function (data) {
-    if (this._opts.layout === 'orgchart') return this._layoutOrg(data);
+    if (this._opts.layout === 'orgchart') this._layoutOrg(data);
+    else this._layoutMind(data);
+    this._decorate(data);
+  };
+
+  MindkeeperMap.prototype._layoutMind = function (data) {
     this._nodes = []; this._links = [];
     var opts = this._opts;
     var W  = this._el.clientWidth  || 800;
@@ -590,12 +735,15 @@
     var opts  = this._opts;
     var selId = this._selectedId;
 
-    while (this._linksG.firstChild) this._linksG.removeChild(this._linksG.firstChild);
+    while (this._linksG.firstChild)  this._linksG.removeChild(this._linksG.firstChild);
+    while (this._xlinksG.firstChild) this._xlinksG.removeChild(this._xlinksG.firstChild);
     while (this._nodesG.firstChild)  this._nodesG.removeChild(this._nodesG.firstChild);
 
     var self = this;
     this._links.forEach(function (lk) { self._drawLink(lk); });
+    this._xlinks.forEach(function (xl) { self._drawXLink(xl); });
     this._nodes.forEach(function (nd) { self._drawNode(nd); });
+    this._drawLegend();
 
     if (selId) {
       this._nodes.forEach(function (nd) {
@@ -651,12 +799,107 @@
     this._linksG.appendChild(path);
   };
 
+  // Cross-link: dashed curve bowing away from the straight line, edge to edge, label at the middle
+  MindkeeperMap.prototype._drawXLink = function (xl) {
+    var s = xl.source, t = xl.target;
+    var dx = t.cx - s.cx, dy = t.cy - s.cy, len = Math.hypot(dx, dy) || 1;
+    // Leave each card at the point where the centre-to-centre line crosses its edge
+    function edge(n, sx, sy) {
+      var k = Math.min(n.w / 2 / (Math.abs(sx) || 1e-9), n.h / 2 / (Math.abs(sy) || 1e-9));
+      return { x: n.cx + sx * k, y: n.cy + sy * k };
+    }
+    var a = edge(s, dx / len, dy / len), b = edge(t, -dx / len, -dy / len);
+    var bow = Math.min(60, len * 0.18);
+    var qx = (a.x + b.x) / 2 - (dy / len) * bow, qy = (a.y + b.y) / 2 + (dx / len) * bow;
+    var colour = xl.diff ? DIFF[xl.diff].stroke : '#6B7280';
+    var g = svgEl('g', { 'class': 'mkmap-xlink' + (xl.type ? ' mkmap-xlink-' + String(xl.type).replace(/[^A-Za-z0-9_-]/g, '_') : '') });
+    g.appendChild(svgEl('path', {
+      d: 'M' + a.x + ',' + a.y + ' Q' + qx + ',' + qy + ' ' + b.x + ',' + b.y,
+      fill: 'none', stroke: colour, 'stroke-width': 1.6,
+      'stroke-dasharray': '6 5', 'stroke-linecap': 'round', opacity: '0.85',
+    }));
+    // Arrow head at the target end
+    var ex = b.x - qx, ey = b.y - qy, el = Math.hypot(ex, ey) || 1;
+    ex /= el; ey /= el;
+    g.appendChild(svgEl('path', {
+      d: 'M' + b.x + ',' + b.y + ' L' + (b.x - ex * 8 - ey * 4) + ',' + (b.y - ey * 8 + ex * 4) +
+         ' L' + (b.x - ex * 8 + ey * 4) + ',' + (b.y - ey * 8 - ex * 4) + ' Z',
+      fill: colour, opacity: '0.85',
+    }));
+    if (xl.label) {
+      // The curve's midpoint (t = 0.5 on the quadratic)
+      var mx = (a.x + 2 * qx + b.x) / 4, my = (a.y + 2 * qy + b.y) / 4;
+      var w = measureText(xl.label, 10, false) + 10;
+      g.appendChild(svgEl('rect', {
+        x: mx - w / 2, y: my - 8, width: w, height: 16, rx: 8, ry: 8,
+        fill: '#ffffff', stroke: colour, 'stroke-width': 1, opacity: '0.95',
+      }));
+      var txt = svgEl('text', {
+        x: mx, y: my, 'text-anchor': 'middle', 'dominant-baseline': 'central',
+        'font-family': this._opts.fontFamily, 'font-size': 10, fill: '#374151', 'pointer-events': 'none',
+      });
+      txt.textContent = xl.label;
+      g.appendChild(txt);
+    }
+    xl._el = g;
+    this._xlinksG.appendChild(g);
+  };
+
+  // Legend for highlightDiff: counts per kind, removed names listed (they are not on the map)
+  MindkeeperMap.prototype._drawLegend = function () {
+    var diff = this._diff;
+    if (!diff) {
+      if (this._legend && this._legend.parentNode) this._legend.parentNode.removeChild(this._legend);
+      this._legend = null;
+      return;
+    }
+    if (!this._legend) {
+      this._legend = document.createElement('div');
+      this._legend.className = 'mkmap-legend';
+      this._legend.style.cssText = 'position:absolute;left:12px;bottom:12px;background:rgba(255,255,255,.94);' +
+        'border:1px solid #d6d9e0;border-radius:8px;padding:8px 10px;font:12px/1.5 ' + this._opts.fontFamily +
+        ';color:#1f2430;box-shadow:0 2px 6px rgba(0,0,0,.08);max-width:280px;pointer-events:none;';
+      this._el.appendChild(this._legend);
+    }
+    var legend = this._legend, info = diff.info || {};
+    while (legend.firstChild) legend.removeChild(legend.firstChild);
+    ['added', 'removed', 'moved', 'changed'].forEach(function (k) {
+      var ids = diff[k] || [];
+      var row = document.createElement('div');
+      var sw = document.createElement('span');
+      sw.style.cssText = 'display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:6px;' +
+        'vertical-align:-2px;border:2px ' + (k === 'moved' ? 'dashed ' : 'solid ') + DIFF[k].stroke + ';';
+      row.appendChild(sw);
+      var text = ids.length + ' ' + DIFF[k].label;
+      if (k === 'removed' && ids.length) {
+        var names = ids.slice(0, 6).map(function (id) { return (info[id] && info[id].topic) || id; });
+        text += ': ' + names.join(', ') + (ids.length > 6 ? ' +' + (ids.length - 6) : '');
+      }
+      row.appendChild(document.createTextNode(text));
+      legend.appendChild(row);
+    });
+  };
+
   MindkeeperMap.prototype._drawNode = function (nd) {
     var self = this;
     var opts = this._opts;
 
-    var g = svgEl('g', { 'class': 'mkmap-node' });
+    var g = svgEl('g', { 'class': 'mkmap-node' + (nd.diff ? ' mkmap-diff-' + nd.diff : '') });
     g.style.cursor = 'grab';
+
+    if (nd.diff) {
+      var ring = svgEl('rect', {
+        x: nd.cx - nd.w / 2 - 5, y: nd.cy - nd.h / 2 - 5,
+        width: nd.w + 10, height: nd.h + 10,
+        rx: (nd.isRoot ? nd.h / 2 : 8) + 5, ry: (nd.isRoot ? nd.h / 2 : 8) + 5,
+        fill: 'none', stroke: DIFF[nd.diff].stroke, 'stroke-width': 3,
+        'pointer-events': 'none',
+      });
+      if (nd.diff === 'moved') ring.setAttribute('stroke-dasharray', '7 4');
+      g.appendChild(ring);
+      // _parts starts below; the ring is re-added to it once that array exists
+      nd._ring = ring;
+    }
 
     var rx   = nd.isRoot ? nd.h / 2 : 8;
     var rect = svgEl('rect', {
@@ -671,6 +914,7 @@
     nd._rect = rect;
     g.appendChild(rect);
     nd._parts = [];
+    if (nd._ring) nd._parts.push({ el: nd._ring, dx: -nd.w / 2 - 5, dy: -nd.h / 2 - 5 });
     if (nd.inactive) {
       rect.setAttribute('stroke-dasharray', '5 4');
       g.setAttribute('opacity', '0.62');
@@ -837,6 +1081,11 @@
       if (lk.source !== nd && lk.target !== nd) return;
       if (lk._el && lk._el.parentNode) lk._el.parentNode.removeChild(lk._el);
       self._drawLink(lk);
+    });
+    this._xlinks.forEach(function (xl) {
+      if (xl.source !== nd && xl.target !== nd) return;
+      if (xl._el && xl._el.parentNode) xl._el.parentNode.removeChild(xl._el);
+      self._drawXLink(xl);
     });
   };
 
@@ -1065,6 +1314,8 @@
   MindkeeperMap.META_KEYS = META_KEYS;
   MindkeeperMap.serialize = serialize;
   MindkeeperMap.LAYOUTS = ['mindmap', 'orgchart'];
+  MindkeeperMap.DIFF = DIFF;
+  MindkeeperMap.diff = diffTrees;
 
   // ── Expose ───────────────────────────────────────────────────────────────────
 

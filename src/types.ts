@@ -39,6 +39,28 @@ export interface MindkeeperMapTreeNode {
   /** Children hidden behind a +N toggle; set by collapse()/expand()/toggle() */
   collapsed?: boolean;
   children?: MindkeeperMapTreeNode[];
+  /** Root only: cross-links drawn as dashed labelled curves (e.g. person -> project) */
+  links?: MindkeeperLink[];
+}
+
+export interface MindkeeperLink {
+  from: string;
+  to: string;
+  /** e.g. 'works on', 'dotted line'; also the label when none is given */
+  type?: string;
+  label?: string;
+}
+
+/** MindkeeperMap.diff(oldData, newData): ids matched across the two trees */
+export interface MindkeeperDiff {
+  added: string[];
+  removed: string[];
+  /** new parent */
+  moved: string[];
+  /** topic, kind or meta differ */
+  changed: string[];
+  links: { added: MindkeeperLink[]; removed: MindkeeperLink[] };
+  info: Record<string, { topic: string; from?: string | null; to?: string | null; fields?: Array<'topic' | 'kind' | 'meta'> }>;
 }
 
 export type MindkeeperNodeKind = 'person' | 'company' | 'team' | 'role' | 'project' | 'idea';
