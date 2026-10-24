@@ -7,6 +7,9 @@
     "src/mindkeeper-map.js",
     "src/types.ts"
   ],
+  "scripts": {
+    "test": "node test/run.js"
+  },
   "keywords": [
     "mindmap",
     "mind-map",
@@ -16,7 +19,9 @@
     "tree",
     "diagram",
     "canvas",
-    "export"
+    "export",
+    "org-chart",
+    "organization-chart"
   ],
   "author": "icedsg",
   "license": "MIT",

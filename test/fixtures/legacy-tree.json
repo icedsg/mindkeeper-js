@@ -1,0 +1,17 @@
+{
+  "id": "root", "topic": "Product launch",
+  "children": [
+    { "id": "a", "topic": "Research", "children": [
+      { "id": "a1", "topic": "Customer interviews" },
+      { "id": "a2", "topic": "Competitor pricing pages" }
+    ] },
+    { "id": "b", "topic": "Design", "children": [
+      { "id": "b1", "topic": "Wireframes" }
+    ] },
+    { "id": "c", "topic": "Engineering", "children": [
+      { "id": "c1", "topic": "API" },
+      { "id": "c2", "topic": "Web app", "children": [ { "id": "c21", "topic": "Onboarding flow" } ] }
+    ] },
+    { "id": "d", "topic": "Marketing" }
+  ]
+}

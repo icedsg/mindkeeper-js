@@ -29,6 +29,49 @@
 
   var ROOT_STYLE = { fill: '#AED6DC', stroke: '#2898B8', text: '#082830' };
 
+  // Typed nodes: optional `kind` picks the card colour and badge glyph.
+  // People show their initials (or `meta.avatar`) instead of a glyph.
+  var KINDS = {
+    person  : { fill: '#DCEBFB', stroke: '#3B82C4', text: '#0b2a4a', glyph: null },
+    company : { fill: '#E3E6EC', stroke: '#5A6475', text: '#1c2230', glyph: 'C' },
+    team    : { fill: '#D7F2E3', stroke: '#3A9E6A', text: '#0f3b24', glyph: 'T' },
+    role    : { fill: '#FCE9C8', stroke: '#C98A1A', text: '#4a3000', glyph: 'R' },
+    project : { fill: '#E8DDFA', stroke: '#7B4FC9', text: '#2a1050', glyph: 'P' },
+    idea    : { fill: '#FBF3BF', stroke: '#B59B12', text: '#3a3000', glyph: 'i' }
+  };
+
+  var META_KEYS = ['title', 'email', 'url', 'avatar', 'start', 'end', 'status'];
+  var INACTIVE  = { inactive: 1, left: 1, ended: 1, closed: 1, archived: 1 };
+
+  function initials(text) {
+    var parts = String(text || '').trim().split(/\s+/).filter(Boolean);
+    if (!parts.length) return '?';
+    var a = parts[0].charAt(0), b = parts.length > 1 ? parts[parts.length - 1].charAt(0) : '';
+    return (a + b).toUpperCase();
+  }
+
+  // Shallow copy of meta without empty values; null when nothing is left
+  function cleanMeta(meta) {
+    if (!meta || typeof meta !== 'object') return null;
+    var out = {}, any = false;
+    Object.keys(meta).forEach(function (k) {
+      var v = meta[k];
+      if (v === null || v === undefined || v === '') return;
+      out[k] = v; any = true;
+    });
+    return any ? out : null;
+  }
+
+  // Plain-object tree (what toJSON returns); kind/meta only when set
+  function serialize(node) {
+    var n = { id: node.id, topic: node.topic };
+    if (node.kind) n.kind = node.kind;
+    var m = cleanMeta(node.meta);
+    if (m) n.meta = m;
+    if (node.children && node.children.length) n.children = node.children.map(serialize);
+    return n;
+  }
+
   // ── SVG helpers ──────────────────────────────────────────────────────────────
 
   function svgEl(tag, attrs) {
@@ -45,6 +88,8 @@
 
   var _ctx2d = null;
   function measureText(text, fontSize, bold) {
+    // No DOM (node tests, SSR): rough average glyph width
+    if (typeof document === 'undefined') return text.length * fontSize * (bold ? 0.6 : 0.55);
     if (!_ctx2d) { _ctx2d = document.createElement('canvas').getContext('2d'); }
     _ctx2d.font = (bold ? '700' : '400') + ' ' + fontSize + 'px system-ui,sans-serif';
     return _ctx2d.measureText(text).width;
@@ -120,12 +165,7 @@
   // Export current tree as a plain JS object
   MindkeeperMap.prototype.toJSON = function () {
     if (!this._data) return null;
-    function clean(node) {
-      var n = { id: node.id, topic: node.topic };
-      if (node.children && node.children.length) n.children = node.children.map(clean);
-      return n;
-    }
-    return clean(this._data);
+    return serialize(this._data);
   };
 
   // Return lightweight info for a single node
@@ -133,11 +173,15 @@
     var found = this._findInTree(id);
     if (!found) return null;
     var n = found.node;
-    return {
+    var info = {
       id: n.id,
       topic: n.topic,
       children: (n.children || []).map(function (c) { return c.id; }),
     };
+    if (n.kind) info.kind = n.kind;
+    var m = cleanMeta(n.meta);
+    if (m) info.meta = m;
+    return info;
   };
 
   // Add a child node to parentId; returns new node's ID
@@ -149,10 +193,11 @@
       topic: (data && data.topic) || 'New Node',
       children: [],
     };
+    this._applyTyped(newNode, data);
     if (!found.node.children) found.node.children = [];
     found.node.children.push(newNode);
     this._refresh();
-    this._emit('nodeAdd', { node: { id: newNode.id, topic: newNode.topic }, parentId: parentId });
+    this._emit('nodeAdd', { node: this.getNode(newNode.id), parentId: parentId });
     return newNode.id;
   };
 
@@ -161,6 +206,7 @@
     var found = this._findInTree(id);
     if (!found) throw new Error('updateNode: node not found — ' + id);
     if (data.topic !== undefined) found.node.topic = String(data.topic);
+    this._applyTyped(found.node, data);
     this._refresh();
     this._emit('nodeUpdate', { id: id, data: data });
     return this;
@@ -195,9 +241,10 @@
       topic: (data && data.topic) || 'New Node',
       children: [existing],
     };
+    this._applyTyped(newNode, data);
     parent.children[idx] = newNode;
     this._refresh();
-    this._emit('nodeAdd', { node: { id: newNode.id, topic: newNode.topic }, parentId: parentId });
+    this._emit('nodeAdd', { node: this.getNode(newNode.id), parentId: parentId });
     return newNode.id;
   };
 
@@ -233,6 +280,18 @@
     return node;
   };
 
+  // kind: a string sets it, null/'' removes it. meta: keys merge in, null/'' removes a key, meta: null clears it.
+  MindkeeperMap.prototype._applyTyped = function (node, data) {
+    if (!data) return;
+    if (data.kind !== undefined) {
+      if (data.kind) node.kind = String(data.kind); else delete node.kind;
+    }
+    if (data.meta !== undefined) {
+      var m = data.meta === null ? null : cleanMeta(Object.assign({}, node.meta || {}, data.meta));
+      if (m) node.meta = m; else delete node.meta;
+    }
+  };
+
   MindkeeperMap.prototype._findInTree = function (id, node, parent) {
     if (node === undefined) node = this._data;
     if (!node) return null;
@@ -247,7 +306,7 @@
 
   MindkeeperMap.prototype._refresh = function () {
     this._layout(this._data);
-    this._draw();
+    if (this._svg) this._draw();
   };
 
   // ── Setup ────────────────────────────────────────────────────────────────────
@@ -310,6 +369,7 @@
       depth: 0, isLeft: false, branchIdx: -1,
       style: ROOT_STYLE, parent: null, isRoot: true,
     };
+    this._typeCard(rootNode, data, 15, true);
     this._nodes.push(rootNode);
 
     var allKids   = data.children || [];
@@ -341,6 +401,7 @@
           style: PALETTE[bIdx % PALETTE.length],
           parent: parentNode,
         };
+        self._typeCard(nd, node, fs, bold);
         self._nodes.push(nd);
         if (parentNode) self._links.push({ source: parentNode, target: nd });
         (node.children || []).forEach(function (child) { place(child, depth + 1, nd, bIdx); });
@@ -351,6 +412,29 @@
 
     layoutSide(rightKids, false);
     layoutSide(leftKids, true);
+  };
+
+  // Typed / titled nodes: kind colours, badge room and a second line for meta.title.
+  // Untyped nodes without a title keep the exact mind-map size and palette.
+  MindkeeperMap.prototype._typeCard = function (nd, node, fs, bold) {
+    var kind = node.kind && KINDS[node.kind] ? node.kind : null;
+    var meta = cleanMeta(node.meta) || {};
+    if (node.kind) nd.kind = node.kind;
+    if (node.meta) nd.meta = meta;
+    if (!kind && !meta.title) return;
+
+    if (kind) nd.style = KINDS[kind];
+    nd.badge = kind ? (KINDS[kind].glyph || initials(node.topic)) : null;
+    nd.avatar = kind === 'person' && meta.avatar ? String(meta.avatar) : null;
+    nd.inactive = !!(meta.status && INACTIVE[String(meta.status).toLowerCase()]);
+    nd.sub = meta.title ? this._trunc(String(meta.title), 34) : null;
+
+    var badgeW = nd.badge ? 28 : 0;
+    var textW  = measureText(nd.topic, fs, bold);
+    if (nd.sub) textW = Math.max(textW, measureText(nd.sub, 11, false));
+    nd.w = Math.max(textW + (nd.isRoot ? 44 : 28) + badgeW, nd.isRoot ? 110 : 96);
+    if (nd.sub) nd.h = Math.max(nd.h, nd.isRoot ? 50 : 44);
+    else if (nd.badge) nd.h = Math.max(nd.h, 32);
   };
 
   MindkeeperMap.prototype._trunc = function (text, max) {
@@ -421,11 +505,21 @@
     });
     nd._rect = rect;
     g.appendChild(rect);
+    nd._parts = [];
+    if (nd.inactive) {
+      rect.setAttribute('stroke-dasharray', '5 4');
+      g.setAttribute('opacity', '0.62');
+    }
+
+    // Offsets from the card centre for the label (badge pushes it right, title line pushes it up)
+    var tdx = nd.badge ? 14 : 0;
+    var tdy = nd.sub ? -8 : 0;
+    if (nd.badge) this._drawBadge(nd, g);
 
     var fs = nd.isRoot ? 15 : nd.depth === 1 ? 13 : 12;
     var fw = nd.isRoot || nd.depth === 1 ? '700' : '400';
     var txt = svgEl('text', {
-      x: nd.cx, y: nd.cy,
+      x: nd.cx + tdx, y: nd.cy + tdy,
       'text-anchor': 'middle',
       'dominant-baseline': 'central',
       'font-family': opts.fontFamily,
@@ -435,7 +529,23 @@
     });
     txt.textContent = nd.topic;
     nd._txt = txt;
+    nd._tdx = tdx; nd._tdy = tdy;
     g.appendChild(txt);
+
+    if (nd.sub) {
+      var sub = svgEl('text', {
+        x: nd.cx + tdx, y: nd.cy + 9,
+        'text-anchor': 'middle',
+        'dominant-baseline': 'central',
+        'font-family': opts.fontFamily,
+        'font-size': 11, 'font-weight': '400',
+        fill: nd.style.text, opacity: '0.78',
+        'pointer-events': 'none',
+      });
+      sub.textContent = nd.sub;
+      g.appendChild(sub);
+      nd._parts.push({ el: sub, dx: tdx, dy: 9 });
+    }
 
     g.addEventListener('mouseenter', function () {
       rect.setAttribute('filter', 'url(#mkmap-sh-hov)');
@@ -457,6 +567,47 @@
     this._bindDrag(nd);
   };
 
+  // Kind badge on the left of the card: a glyph / initials circle, or the avatar image
+  MindkeeperMap.prototype._drawBadge = function (nd, g) {
+    var opts = this._opts;
+    var bdx = -nd.w / 2 + 17;
+    var circle = svgEl('circle', {
+      cx: nd.cx + bdx, cy: nd.cy, r: 11,
+      fill: nd.style.stroke, 'pointer-events': 'none',
+    });
+    g.appendChild(circle);
+    nd._parts.push({ el: circle, dx: bdx, dy: 0, xAttr: 'cx', yAttr: 'cy' });
+
+    if (nd.avatar) {
+      var clipId = 'mkmap-av-' + String(nd.id).replace(/[^A-Za-z0-9_-]/g, '_');
+      var clip = svgEl('clipPath', { id: clipId });
+      var cc = svgEl('circle', { cx: nd.cx + bdx, cy: nd.cy, r: 10 });
+      clip.appendChild(cc);
+      g.appendChild(clip);
+      nd._parts.push({ el: cc, dx: bdx, dy: 0, xAttr: 'cx', yAttr: 'cy' });
+      var img = svgEl('image', {
+        x: nd.cx + bdx - 10, y: nd.cy - 10, width: 20, height: 20,
+        href: nd.avatar, 'clip-path': 'url(#' + clipId + ')',
+        preserveAspectRatio: 'xMidYMid slice', 'pointer-events': 'none',
+      });
+      g.appendChild(img);
+      nd._parts.push({ el: img, dx: bdx - 10, dy: -10 });
+      return;
+    }
+
+    var glyph = svgEl('text', {
+      x: nd.cx + bdx, y: nd.cy,
+      'text-anchor': 'middle',
+      'dominant-baseline': 'central',
+      'font-family': opts.fontFamily,
+      'font-size': nd.badge.length > 1 ? 9 : 11, 'font-weight': '700',
+      fill: '#ffffff', 'pointer-events': 'none',
+    });
+    glyph.textContent = nd.badge;
+    g.appendChild(glyph);
+    nd._parts.push({ el: glyph, dx: bdx, dy: 0 });
+  };
+
   MindkeeperMap.prototype._setSelected = function (id) {
     var opts = this._opts;
     var prev = this._selectedId;
@@ -473,8 +624,12 @@
   MindkeeperMap.prototype._moveNode = function (nd) {
     nd._rect.setAttribute('x', nd.cx - nd.w / 2);
     nd._rect.setAttribute('y', nd.cy - nd.h / 2);
-    nd._txt.setAttribute('x', nd.cx);
-    nd._txt.setAttribute('y', nd.cy);
+    nd._txt.setAttribute('x', nd.cx + (nd._tdx || 0));
+    nd._txt.setAttribute('y', nd.cy + (nd._tdy || 0));
+    (nd._parts || []).forEach(function (p) {
+      p.el.setAttribute(p.xAttr || 'x', nd.cx + p.dx);
+      p.el.setAttribute(p.yAttr || 'y', nd.cy + p.dy);
+    });
 
     var self = this;
     this._links.forEach(function (lk) {
@@ -702,6 +857,12 @@
     img.onerror = function () { URL.revokeObjectURL(url); };
     img.src = url;
   };
+
+  // ── Static helpers (pure, no DOM) ────────────────────────────────────────────
+
+  MindkeeperMap.KINDS = KINDS;
+  MindkeeperMap.META_KEYS = META_KEYS;
+  MindkeeperMap.serialize = serialize;
 
   // ── Expose ───────────────────────────────────────────────────────────────────
 
