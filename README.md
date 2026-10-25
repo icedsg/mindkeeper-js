@@ -1,13 +1,13 @@
 # mindkeeper-map.js
 
-A standalone interactive mind map library for the web. Zero dependencies, no build step — drop in a single JS file and start building.
+A standalone interactive mind map and org chart library for the web. Zero dependencies, no build step — drop in a single JS file and start building.
 
 [![npm](https://img.shields.io/npm/v/mindkeeper-map?style=flat-square&color=58a6ff)](https://www.npmjs.com/package/mindkeeper-map)
 [![license](https://img.shields.io/badge/license-MIT-green?style=flat-square)](./LICENSE)
 [![no dependencies](https://img.shields.io/badge/dependencies-0-brightgreen?style=flat-square)](./package.json)
 [![bundle size](https://img.shields.io/bundlephobia/minzip/mindkeeper-map?style=flat-square&label=minzipped)](https://bundlephobia.com/package/mindkeeper-map)
 
-**[Live Demo & Docs →](https://icedsg.github.io/mindkeeper-js)**
+**[Live Demo & Docs →](https://icedsg.github.io/mindkeeper-js)** · samples: [org chart](https://icedsg.github.io/mindkeeper-js/orgchart.html) · [reorg diff](https://icedsg.github.io/mindkeeper-js/reorg.html) · [portfolio](https://icedsg.github.io/mindkeeper-js/portfolio.html)
 
 ---
 
@@ -20,7 +20,12 @@ A standalone interactive mind map library for the web. Zero dependencies, no bui
 - **Insert between** — insert a node between any two connected nodes
 - **JSON import/export** — `fromJSON()` / `toJSON()` for persistence
 - **PNG & SVG export** — high-DPI PNG and vector SVG, no extra dependencies
-- **Event system** — `nodeClick`, `nodeAdd`, `nodeUpdate`, `nodeDelete`
+- **Org-chart layout** — `layout: 'orgchart'` draws a top-down tree (manager above reports), switchable at runtime with `setLayout()`
+- **Typed nodes** — optional `kind` (person, company, team, role, project, idea) and `meta` (title, email, avatar, status...) give each card a colour, badge and subtitle
+- **Collapse / expand** — fold any branch; the state is kept in `toJSON()`
+- **Cross-links** — dashed, labelled links between any two nodes (person → project, advisor → company)
+- **Diff highlight** — `MindkeeperMap.diff(before, after)` + `highlightDiff()` show who joined, left, moved or changed
+- **Event system** — `nodeClick`, `nodeAdd`, `nodeUpdate`, `nodeDelete`, `nodeToggle`, `linkAdd`, `linkRemove`
 - **Zero dependencies** — one file, pure web platform APIs, works everywhere
 
 ---
@@ -76,7 +81,11 @@ const map = new MindkeeperMap(selector, options?)
 
 | Option | Default | Description |
 |--------|---------|-------------|
+| `layout` | `'mindmap'` | `'mindmap'` (branches left/right of the root) or `'orgchart'` (top-down) |
 | `levelWidth` | `240` | Horizontal spacing between depth levels (px) |
+| `levelHeight` | `110` | Org chart: vertical distance between levels (px) |
+| `hSpacing` | `24` | Org chart: gap between sibling subtrees (px) |
+| `stackLeaves` | `4` | Org chart: a manager with this many reports, all without reports of their own, lists them in a column (`0` = never) |
 | `vSpacing` | `54` | Vertical spacing between siblings (px) |
 | `linkStroke` | `3` | Link line width (px) |
 | `nodeBorder` | `2.5` | Node border width (px) |
@@ -96,11 +105,11 @@ Export the current tree as a plain JS object (same format as the input).
 #### `.getNode(id)` → `{ id, topic, children: string[] } | null`
 Return lightweight metadata for a node.
 
-#### `.addNode(parentId, { topic, id? })` → `string`
+#### `.addNode(parentId, { topic, id?, kind?, meta? })` → `string`
 Add a child to the given parent. Returns the new node's id.
 
-#### `.updateNode(id, { topic })` → `this`
-Update a node's label. The map re-renders automatically.
+#### `.updateNode(id, { topic?, kind?, meta? })` → `this`
+Update a node's label, kind or meta. The map re-renders automatically.
 
 #### `.deleteNode(id)` → `this`
 Delete a node and all its descendants. Throws if called on the root.
@@ -112,6 +121,21 @@ Insert a new node between `parentId` and `childId`. The existing child becomes a
 Before: Root → Work
 After:  Root → Category → Work
 ```
+
+#### `.setLayout('mindmap' | 'orgchart')` → `this`
+Switch layout and refit.
+
+#### `.collapse(id)` / `.expand(id)` / `.toggle(id)` / `.collapseAll()` / `.expandAll()` → `this`
+Fold or open branches. Managers show a +/− toggle under the card; collapsed nodes are saved as `collapsed: true`.
+
+#### `.addLink(from, to, type?, label?)` / `.removeLink(from, to, type?)` / `.getLinks()`
+Cross-links between any two nodes, drawn as dashed curves with a label (the label defaults to the type). A link whose end sits inside a collapsed branch is drawn to the nearest visible ancestor.
+
+#### `MindkeeperMap.diff(before, after)` → `diff`
+Static. Compares two trees by node id and returns `{ added, removed, moved, changed, links: { added, removed }, info }` (`info[id]` gives the topic, old/new parent and changed fields).
+
+#### `.highlightDiff(diff)` / `.clearDiff()` → `this`
+Ring the cards from a diff: green added, red removed, amber changed, dashed amber moved, with a legend listing removed names.
 
 #### `.fit()` → `this`
 Fit the entire map into the container view.
@@ -131,6 +155,9 @@ Subscribe / unsubscribe from events.
 | `nodeUpdate` | `{ id, data }` | A node was updated |
 | `nodeDelete` | `{ id }` | A node was deleted |
 | `nodeDeselect` | `{}` | Background was clicked (selection cleared) |
+| `nodeToggle` | `{ id, collapsed }` | A branch was collapsed or expanded |
+| `linkAdd` | `{ link }` | A cross-link was added |
+| `linkRemove` | `{ from, to, type }` | A cross-link was removed |
 
 ---
 
@@ -181,6 +208,28 @@ localStorage.setItem('map', JSON.stringify(json));
 map.fromJSON(JSON.parse(localStorage.getItem('map')));
 ```
 
+### Org chart
+
+```js
+const org = new MindkeeperMap('#org', { layout: 'orgchart' });
+org.init({
+  id: 'ceo', topic: 'Ada Park', kind: 'person', meta: { title: 'CEO' },
+  children: [
+    { id: 'cto', topic: 'Lin Chen', kind: 'person', meta: { title: 'CTO' }, children: [
+      { id: 'platform', topic: 'Platform', kind: 'team', children: [
+        { topic: 'Sam Ortiz', kind: 'person', meta: { title: 'Engineer' } }
+      ]}
+    ]},
+    { id: 'apollo', topic: 'Apollo', kind: 'project' }
+  ],
+  links: [{ from: 'cto', to: 'apollo', type: 'leads' }]
+});
+
+// Who changed between two versions of the chart?
+const diff = MindkeeperMap.diff(januaryData, julyData);
+org.init(julyData).highlightDiff(diff);
+```
+
 ### JSON Format
 
 ```json
@@ -206,6 +255,15 @@ map.fromJSON(JSON.parse(localStorage.getItem('map')));
 
 `id` fields are optional on input — stable ids are generated for any node that omits them.
 
+Optional fields (all backwards compatible — maps without them render exactly as before):
+
+| Field | Where | Meaning |
+|-------|-------|---------|
+| `kind` | node | `person`, `company`, `team`, `role`, `project` or `idea` |
+| `meta` | node | `{ title, email, url, avatar, start, end, status }`; `status: 'left'` (or ended/closed/archived/inactive) draws a faded dashed card |
+| `collapsed` | node | `true` hides the node's children |
+| `links` | root | `[{ from, to, type?, label? }]` cross-links by node id |
+
 ---
 
 ## GitHub Pages Setup
@@ -214,14 +272,14 @@ The docs site is served from the `docs/` folder. To enable GitHub Pages:
 
 1. Push this repo to GitHub
 2. Go to **Settings → Pages**
-3. Set **Source** to `Deploy from a branch`, branch `main`, folder `/docs`
+3. Set **Source** to `Deploy from a branch`, branch `master`, folder `/docs`
 4. Your site will be live at `https://<username>.github.io/mindkeeper-js/`
 
 ---
 
 ## Related
 
-- **[mindkeeper-mcp](https://www.npmjs.com/package/mindkeeper-mcp)** — CLI / MCP server for managing mind maps from the terminal and AI assistants. The JSON format is compatible — export from mindkeeper-mcp and visualise with mindkeeper-map.js.
+- **[mindkeeper-mcp](https://www.npmjs.com/package/mindkeeper-mcp)** — CLI / MCP server for managing mind maps and org charts from AI assistants (entities, links, change history, CSV import). Its `export_orgchart` tool emits this library's JSON format directly.
 
 ---
 

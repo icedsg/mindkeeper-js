@@ -1,11 +1,12 @@
 {
   "name": "mindkeeper-map",
-  "version": "1.0.0",
-  "description": "Standalone interactive mind map renderer for the web. Zero dependencies, single JS file, full CRUD API.",
+  "version": "1.2.0",
+  "description": "Standalone interactive mind map and org chart renderer for the web. Zero dependencies, single JS file, full CRUD API.",
   "main": "src/mindkeeper-map.js",
   "files": [
     "src/mindkeeper-map.js",
-    "src/types.ts"
+    "src/types.ts",
+    "CHANGELOG.md"
   ],
   "scripts": {
     "test": "node test/run.js"
@@ -21,7 +22,10 @@
     "canvas",
     "export",
     "org-chart",
-    "organization-chart"
+    "organization-chart",
+    "orgchart",
+    "hierarchy",
+    "reorg"
   ],
   "author": "icedsg",
   "license": "MIT",

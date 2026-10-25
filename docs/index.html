@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>mindkeeper-map.js — Interactive Mind Map Library</title>
-  <meta name="description" content="Zero-dependency JavaScript library for building interactive mind maps on the web. SVG rendering, full CRUD API, PNG/SVG export." />
+  <title>mindkeeper-map.js — Interactive Mind Map &amp; Org Chart Library</title>
+  <meta name="description" content="Zero-dependency JavaScript library for interactive mind maps and org charts on the web. Top-down org-chart layout, typed nodes, cross-links, reorg diff, full CRUD API, PNG/SVG export." />
   <link rel="stylesheet" href="./style.css" />
 </head>
 <body>
@@ -126,7 +126,22 @@
       <div class="feature-card">
         <span class="feature-icon">📡</span>
         <h3>Event System</h3>
-        <p>Subscribe to <code>nodeClick</code>, <code>nodeAdd</code>, <code>nodeUpdate</code>, and <code>nodeDelete</code> to build reactive UIs on top.</p>
+        <p>Subscribe to <code>nodeClick</code>, <code>nodeAdd</code>, <code>nodeUpdate</code>, <code>nodeDelete</code>, <code>nodeToggle</code> and <code>linkAdd</code> to build reactive UIs on top.</p>
+      </div>
+      <div class="feature-card">
+        <span class="feature-icon">🏢</span>
+        <h3>Org Charts</h3>
+        <p><code>layout: 'orgchart'</code> draws managers above their reports, with collapsible branches. Typed nodes (person, team, company, project) get a colour, badge and job title. <a href="./orgchart.html">See the 40-person sample</a>.</p>
+      </div>
+      <div class="feature-card">
+        <span class="feature-icon">🔗</span>
+        <h3>Cross-links</h3>
+        <p>Dashed, labelled links between any two nodes for many-to-many ties: people to projects, advisors to companies. <a href="./portfolio.html">Portfolio sample</a>.</p>
+      </div>
+      <div class="feature-card">
+        <span class="feature-icon">🔀</span>
+        <h3>Reorg Diff</h3>
+        <p><code>MindkeeperMap.diff(before, after)</code> finds who joined, left, moved or changed title; <code>highlightDiff()</code> marks them on the chart. <a href="./reorg.html">January vs July sample</a>.</p>
       </div>
     </div>
   </div>
@@ -194,7 +209,11 @@ map.<span class="tok-tag">init</span>(treeData);</code></pre>
         <div class="api-card-body">
           <p>Create an instance. <code>selector</code> is a CSS selector string or an Element. All options are optional:</p>
           <pre><code>{
+  layout:     <span class="tok-str">'mindmap'</span>, <span class="tok-cmt">// or 'orgchart' (top-down)</span>
   levelWidth: <span class="tok-num">240</span>,   <span class="tok-cmt">// px between depth levels</span>
+  levelHeight:<span class="tok-num">110</span>,   <span class="tok-cmt">// orgchart: px between levels</span>
+  hSpacing:   <span class="tok-num">24</span>,    <span class="tok-cmt">// orgchart: gap between subtrees</span>
+  stackLeaves:<span class="tok-num">4</span>,     <span class="tok-cmt">// orgchart: list 4+ leaf reports in a column</span>
   vSpacing:   <span class="tok-num">54</span>,    <span class="tok-cmt">// px between siblings</span>
   linkStroke: <span class="tok-num">3</span>,     <span class="tok-cmt">// link line width</span>
   nodeBorder: <span class="tok-num">2.5</span>,   <span class="tok-cmt">// node border width</span>
@@ -281,6 +300,32 @@ map.<span class="tok-tag">fromJSON</span>(JSON.<span class="tok-tag">parse</span
       </div>
 
       <div class="api-card">
+        <div class="api-card-header">.setLayout(name) / .collapse(id) / .expand(id) / .toggle(id)</div>
+        <div class="api-card-body">
+          <p>Switch between <code>'mindmap'</code> and <code>'orgchart'</code>, and fold branches. <code>collapseAll()</code> / <code>expandAll()</code> do every branch; collapsed nodes are saved as <code>collapsed: true</code>.</p>
+          <pre><code>map.<span class="tok-tag">setLayout</span>(<span class="tok-str">'orgchart'</span>);
+map.<span class="tok-tag">collapse</span>(<span class="tok-str">'engineering'</span>);</code></pre>
+        </div>
+      </div>
+
+      <div class="api-card">
+        <div class="api-card-header">.addLink(from, to, type?, label?) / .removeLink(from, to, type?)</div>
+        <div class="api-card-body">
+          <p>Cross-links outside the tree, drawn as dashed curves with a label. <code>getLinks()</code> lists them; they are saved in <code>toJSON().links</code>.</p>
+          <pre><code>map.<span class="tok-tag">addLink</span>(<span class="tok-str">'lin'</span>, <span class="tok-str">'apollo'</span>, <span class="tok-str">'leads'</span>);</code></pre>
+        </div>
+      </div>
+
+      <div class="api-card">
+        <div class="api-card-header">MindkeeperMap.diff(a, b) / .highlightDiff(diff)</div>
+        <div class="api-card-body">
+          <p>Compare two trees by id: <code>{ added, removed, moved, changed, links, info }</code>. <code>highlightDiff</code> rings the cards (green added, red removed, amber changed or moved) and adds a legend; <code>clearDiff()</code> removes it.</p>
+          <pre><code><span class="tok-key">const</span> diff = MindkeeperMap.<span class="tok-tag">diff</span>(jan, jul);
+map.<span class="tok-tag">init</span>(jul).<span class="tok-tag">highlightDiff</span>(diff);</code></pre>
+        </div>
+      </div>
+
+      <div class="api-card">
         <div class="api-card-header">.exportPNG(filename?) / .exportSVG(filename?)</div>
         <div class="api-card-body">
           <p>Download the full mindmap as a high-DPI PNG or a clean vector SVG. No dependencies — built on <code>XMLSerializer</code> and <code>Canvas 2D</code>.</p>
@@ -341,6 +386,16 @@ map.<span class="tok-tag">exportSVG</span>(<span class="tok-str">'my-map.svg'</s
           <td>{}</td>
           <td>The background was clicked, clearing selection</td>
         </tr>
+        <tr>
+          <td>nodeToggle</td>
+          <td>{ id, collapsed }</td>
+          <td>A branch was collapsed or expanded</td>
+        </tr>
+        <tr>
+          <td>linkAdd / linkRemove</td>
+          <td>{ link } / { from, to, type }</td>
+          <td>A cross-link was added or removed</td>
+        </tr>
       </tbody>
     </table>
 
@@ -381,9 +436,14 @@ map.<span class="tok-tag">exportSVG</span>(<span class="tok-str">'my-map.svg'</s
       </div>
       <div>
         <div class="feature-card" style="margin-bottom:16px;">
+          <span class="feature-icon">🏷️</span>
+          <h3>Optional org fields</h3>
+          <p>Any node can carry <code>"kind"</code> (person, company, team, role, project, idea), <code>"meta"</code> (title, email, url, avatar, start, end, status) and <code>"collapsed": true</code>. The root can carry <code>"links": [{ "from", "to", "type" }]</code>. Maps without them render as before.</p>
+        </div>
+        <div class="feature-card" style="margin-bottom:16px;">
           <span class="feature-icon">💡</span>
           <h3>Works with mindkeeper-mcp</h3>
-          <p>Export your mind map from the <a href="https://www.npmjs.com/package/mindkeeper-mcp" target="_blank" rel="noopener">mindkeeper-mcp</a> CLI or MCP server (<code>~/.mindkeeper/mindmap.json</code>) and pass it directly to <code>fromJSON()</code>.</p>
+          <p>Export your mind map from the <a href="https://www.npmjs.com/package/mindkeeper-mcp" target="_blank" rel="noopener">mindkeeper-mcp</a> CLI or MCP server (<code>~/.mindkeeper/mindmap.json</code>, or its <code>export_orgchart</code> tool) and pass it directly to <code>fromJSON()</code>.</p>
         </div>
         <div class="feature-card">
           <span class="feature-icon">💾</span>
