@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Org chart sample — mindkeeper-map.js</title>
+  <meta name="description" content="A 40-person sample company drawn as an interactive org chart with mindkeeper-map.js: top-down layout, titles, collapsible teams, PNG/SVG export." />
+  <link rel="stylesheet" href="./style.css" />
+  <style>
+    .chart { position: relative; width: 100%; height: 640px; background: var(--bg-alt); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+    .toolbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; }
+    .toolbar .note { color: var(--text-muted); font-size: 0.85rem; margin-left: auto; }
+    .sample-footer { border-top: 1px solid var(--border); padding: 24px 0; color: var(--text-muted); font-size: 0.85rem; }
+  </style>
+</head>
+<body>
+
+<nav>
+  <div class="container nav-inner">
+    <a class="nav-logo" href="./demo.html">
+      <span style="font-size:1.2rem;">🧠</span>
+      mindkeeper-<span class="logo-accent">map</span>.js
+    </a>
+    <div class="nav-links">
+      <a href="./orgchart.html" class="active">Org chart</a>
+      <a href="./reorg.html">Reorg diff</a>
+      <a href="./portfolio.html">Portfolio</a>
+      <a href="https://github.com/icedsg/mindkeeper-js" target="_blank" rel="noopener">GitHub</a>
+    </div>
+  </div>
+</nav>
+
+<section style="padding: 40px 0 0;">
+  <div class="container">
+    <p class="section-label">Sample</p>
+    <h2 class="section-title">A 40-person company as an org chart</h2>
+    <p class="section-sub">
+      Northwind Labs (made up) with <code>layout: 'orgchart'</code>: managers sit above their reports, each card shows
+      the name and title, and the +/- under a manager folds that branch. Leaf teams of four or more stack in a column.
+      Drag to pan, scroll to zoom.
+    </p>
+  </div>
+</section>
+
+<section style="padding-top: 24px;">
+  <div class="container">
+    <div class="toolbar">
+      <button class="btn btn-outline btn-sm" id="btn-collapse">Collapse all</button>
+      <button class="btn btn-outline btn-sm" id="btn-expand">Expand all</button>
+      <button class="btn btn-outline btn-sm" id="btn-layout">Show as mind map</button>
+      <button class="btn btn-outline btn-sm" id="btn-png">Export PNG</button>
+      <button class="btn btn-outline btn-sm" id="btn-svg">Export SVG</button>
+      <span class="note" id="count"></span>
+    </div>
+    <div id="chart" class="chart"></div>
+
+    <pre style="margin-top:24px;"><code>const map = new MindkeeperMap('#chart', { layout: 'orgchart' });
+map.init({
+  id: 'maya', topic: 'Maya Chen', kind: 'person', meta: { title: 'CEO' },
+  children: [
+    { id: 'daniel', topic: 'Daniel Okafor', kind: 'person', meta: { title: 'CTO' }, children: [ /* ... */ ] },
+    // ...
+  ]
+});
+map.on('nodeToggle', e => console.log(e));</code></pre>
+    <p class="section-sub" style="margin-top:12px;">
+      The data is in <a href="./samples-data.js">samples-data.js</a>. With
+      <a href="https://github.com/icedsg/mindkeeper-mcp">mindkeeper-mcp</a> an assistant can build the same chart
+      from a CSV (<code>import_csv</code>) and export it (<code>export_orgchart</code>).
+    </p>
+  </div>
+</section>
+
+<footer class="sample-footer">
+  <div class="container">
+    Built by <a href="https://github.com/icedsg" target="_blank" rel="noopener">icedsg</a> · MIT License ·
+    <a href="./demo.html">Demo</a>
+  </div>
+</footer>
+
+<script src="../src/mindkeeper-map.js"></script>
+<script src="./samples-data.js"></script>
+<script>
+var map = new MindkeeperMap('#chart', { layout: 'orgchart' }).init(MK_SAMPLES.orgJan);
+var layout = 'orgchart';
+document.getElementById('count').textContent = MK_SAMPLES.count(MK_SAMPLES.orgJan) + ' people';
+document.getElementById('btn-collapse').onclick = function () { map.collapseAll(); };
+document.getElementById('btn-expand').onclick = function () { map.expandAll(); };
+document.getElementById('btn-layout').onclick = function () {
+  layout = layout === 'orgchart' ? 'mindmap' : 'orgchart';
+  map.setLayout(layout);
+  this.textContent = layout === 'orgchart' ? 'Show as mind map' : 'Show as org chart';
+};
+document.getElementById('btn-png').onclick = function () { map.exportPNG('northwind-orgchart.png'); };
+document.getElementById('btn-svg').onclick = function () { map.exportSVG('northwind-orgchart.svg'); };
+</script>
+
+</body>
+</html>

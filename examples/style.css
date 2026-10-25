@@ -365,3 +365,8 @@ footer {
   .nav-links { display: none; }
   .footer-inner { flex-direction: column; align-items: flex-start; }
 }
+
+/* ── Sample pages (orgchart, reorg, portfolio) ── */
+.nav-logo .logo-accent { color: var(--accent); }
+.nav-links a.active { color: var(--accent); }
+.btn-sm { padding: 6px 14px; font-size: 0.82rem; }

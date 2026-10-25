@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Reorg diff sample — mindkeeper-map.js</title>
+  <meta name="description" content="January vs July org chart of a sample company with mindkeeper-map.js: MindkeeperMap.diff and highlightDiff mark who joined, left, moved or changed title." />
+  <link rel="stylesheet" href="./style.css" />
+  <style>
+    .chart { position: relative; width: 100%; height: 640px; background: var(--bg-alt); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+    .toolbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; }
+    .toolbar .btn.on { border-color: var(--accent); color: var(--accent); }
+    .changes { margin-top: 20px; display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+    .changes div { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; font-size: 0.88rem; }
+    .changes h4 { margin: 0 0 6px; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); }
+    .changes ul { margin: 0; padding-left: 18px; }
+    .sample-footer { border-top: 1px solid var(--border); padding: 24px 0; color: var(--text-muted); font-size: 0.85rem; }
+  </style>
+</head>
+<body>
+
+<nav>
+  <div class="container nav-inner">
+    <a class="nav-logo" href="./index.html">
+      <span style="font-size:1.2rem;">🧠</span>
+      mindkeeper-<span class="logo-accent">map</span>.js
+    </a>
+    <div class="nav-links">
+      <a href="./orgchart.html">Org chart</a>
+      <a href="./reorg.html" class="active">Reorg diff</a>
+      <a href="./portfolio.html">Portfolio</a>
+      <a href="https://github.com/icedsg/mindkeeper-js" target="_blank" rel="noopener">GitHub</a>
+    </div>
+  </div>
+</nav>
+
+<section style="padding: 40px 0 0;">
+  <div class="container">
+    <p class="section-label">Sample</p>
+    <h2 class="section-title">January vs July: what the reorg changed</h2>
+    <p class="section-sub">
+      <code>MindkeeperMap.diff(jan, jul)</code> compares two trees by node id, and <code>highlightDiff()</code> rings the
+      cards: green joined, red left, amber title changed, dashed amber moved to a new manager. On the July chart the
+      people who left are listed in the legend; switch to January to see them in place.
+    </p>
+  </div>
+</section>
+
+<section style="padding-top: 24px;">
+  <div class="container">
+    <div class="toolbar">
+      <button class="btn btn-outline btn-sm" id="btn-jan">January</button>
+      <button class="btn btn-outline btn-sm on" id="btn-jul">July</button>
+      <button class="btn btn-outline btn-sm" id="btn-hl">Hide changes</button>
+    </div>
+    <div id="chart" class="chart"></div>
+    <div class="changes" id="changes"></div>
+
+    <pre style="margin-top:24px;"><code>const diff = MindkeeperMap.diff(january, july);
+// { added: [...], removed: [...], moved: [...], changed: [...], links: { added, removed }, info: { id: { topic, from, to, fields } } }
+map.init(july).highlightDiff(diff);
+map.clearDiff();</code></pre>
+    <p class="section-sub" style="margin-top:12px;">
+      <a href="https://github.com/icedsg/mindkeeper-mcp">mindkeeper-mcp</a> keeps a change history with effective
+      dates, so an assistant can answer the same question with <code>diff_between('2026-01-31', '2026-07-31')</code>.
+      Data: <a href="./samples-data.js">samples-data.js</a>.
+    </p>
+  </div>
+</section>
+
+<footer class="sample-footer">
+  <div class="container">
+    Built by <a href="https://github.com/icedsg" target="_blank" rel="noopener">icedsg</a> · MIT License ·
+    <a href="./index.html">mindkeeper-map.js home</a>
+  </div>
+</footer>
+
+<script src="./mindkeeper-map.js"></script>
+<script src="./samples-data.js"></script>
+<script>
+var diff = MindkeeperMap.diff(MK_SAMPLES.orgJan, MK_SAMPLES.orgJul);
+var map = new MindkeeperMap('#chart', { layout: 'orgchart' });
+var shown = 'jul', highlight = true;
+
+function show(which) {
+  shown = which;
+  map.init(which === 'jan' ? MK_SAMPLES.orgJan : MK_SAMPLES.orgJul);
+  map.highlightDiff(highlight ? diff : null);
+  document.getElementById('btn-jan').classList.toggle('on', which === 'jan');
+  document.getElementById('btn-jul').classList.toggle('on', which === 'jul');
+}
+
+document.getElementById('btn-jan').onclick = function () { show('jan'); };
+document.getElementById('btn-jul').onclick = function () { show('jul'); };
+document.getElementById('btn-hl').onclick = function () {
+  highlight = !highlight;
+  map.highlightDiff(highlight ? diff : null);
+  this.textContent = highlight ? 'Hide changes' : 'Show changes';
+};
+
+// The same diff as a plain list
+function name(id) { return (diff.info[id] && diff.info[id].topic) || id; }
+function index(node, parent, into) {
+  into[node.id] = { node: node, parent: parent };
+  (node.children || []).forEach(function (ch) { index(ch, node, into); });
+  return into;
+}
+var jan = index(MK_SAMPLES.orgJan, null, {}), jul = index(MK_SAMPLES.orgJul, null, {});
+
+var groups = [
+  ['Joined', diff.added.map(function (id) { return name(id) + ' (' + jul[id].node.meta.title + ', under ' + jul[id].parent.topic + ')'; })],
+  ['Left', diff.removed.map(function (id) { return name(id) + ' (' + jan[id].node.meta.title + ')'; })],
+  ['New manager', diff.moved.map(function (id) { return name(id) + ': ' + jan[id].parent.topic + ' → ' + jul[id].parent.topic; })],
+  ['Title changed', diff.changed.map(function (id) { return name(id) + ': ' + jan[id].node.meta.title + ' → ' + jul[id].node.meta.title; })]
+];
+var box = document.getElementById('changes');
+groups.forEach(function (g) {
+  var div = document.createElement('div');
+  var h = document.createElement('h4');
+  h.textContent = g[0] + ' (' + g[1].length + ')';
+  var ul = document.createElement('ul');
+  g[1].forEach(function (t) { var li = document.createElement('li'); li.textContent = t; ul.appendChild(li); });
+  div.appendChild(h); div.appendChild(ul); box.appendChild(div);
+});
+
+show('jul');
+</script>
+
+<!-- b59.link page-view tag -->
+<script>
+(function () {
+  var i = new Image();
+  i.referrerPolicy = 'no-referrer-when-downgrade';
+  i.src = 'https://b59.link/tag?id=615ec9c4-89bf-4624-abaf-7c996e7fb101&u=' + encodeURIComponent(location.href) + '&r=' + encodeURIComponent(document.referrer);
+})();
+</script>
+<noscript><img src="https://b59.link/tag?615ec9c4-89bf-4624-abaf-7c996e7fb101" width="1" height="1" alt="" referrerpolicy="no-referrer-when-downgrade" style="position:absolute;border:0" /></noscript>
+</body>
+</html>

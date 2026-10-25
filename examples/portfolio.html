@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Portfolio sample — mindkeeper-map.js</title>
+  <meta name="description" content="People, companies and projects in one chart with mindkeeper-map.js: typed nodes plus labelled cross-links for advisors, board seats and shared projects." />
+  <link rel="stylesheet" href="./style.css" />
+  <style>
+    .chart { position: relative; width: 100%; height: 620px; background: var(--bg-alt); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+    .toolbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; }
+    .toolbar .note { color: var(--text-muted); font-size: 0.85rem; margin-left: auto; }
+    .sample-footer { border-top: 1px solid var(--border); padding: 24px 0; color: var(--text-muted); font-size: 0.85rem; }
+  </style>
+</head>
+<body>
+
+<nav>
+  <div class="container nav-inner">
+    <a class="nav-logo" href="./demo.html">
+      <span style="font-size:1.2rem;">🧠</span>
+      mindkeeper-<span class="logo-accent">map</span>.js
+    </a>
+    <div class="nav-links">
+      <a href="./orgchart.html">Org chart</a>
+      <a href="./reorg.html">Reorg diff</a>
+      <a href="./portfolio.html" class="active">Portfolio</a>
+      <a href="https://github.com/icedsg/mindkeeper-js" target="_blank" rel="noopener">GitHub</a>
+    </div>
+  </div>
+</nav>
+
+<section style="padding: 40px 0 0;">
+  <div class="container">
+    <p class="section-label">Sample</p>
+    <h2 class="section-title">People × companies × projects</h2>
+    <p class="section-sub">
+      A holding company with three portfolio companies, their people and projects. The tree says who belongs where;
+      the dashed, labelled <code>links</code> carry everything that crosses it: an advisor on two boards, a CTO
+      helping a sister company, one product powering another. Ended projects show as faded dashed cards.
+    </p>
+  </div>
+</section>
+
+<section style="padding-top: 24px;">
+  <div class="container">
+    <div class="toolbar">
+      <button class="btn btn-outline btn-sm" id="btn-layout">Show as org chart</button>
+      <button class="btn btn-outline btn-sm" id="btn-link">Add a link: Rhea Kapoor → Route planner</button>
+      <button class="btn btn-outline btn-sm" id="btn-svg">Export SVG</button>
+      <span class="note" id="count"></span>
+    </div>
+    <div id="chart" class="chart"></div>
+
+    <pre style="margin-top:24px;"><code>map.init({
+  id: 'group', topic: 'Harbor Group', kind: 'company',
+  children: [ /* companies, people, projects, teams */ ],
+  links: [
+    { from: 'pf-helen', to: 'northwind', type: 'board' },
+    { from: 'atlas', to: 'routes', type: 'powers' }
+  ]
+});
+map.addLink('pf-rhea', 'routes', 'investor');
+map.getLinks();</code></pre>
+    <p class="section-sub" style="margin-top:12px;">
+      In <a href="https://github.com/icedsg/mindkeeper-mcp">mindkeeper-mcp</a> the same graph is built with
+      <code>add_entity</code> and <code>link_entities</code>, and queried with <code>projects_of</code> and
+      <code>members_of</code>. Data: <a href="./samples-data.js">samples-data.js</a>.
+    </p>
+  </div>
+</section>
+
+<footer class="sample-footer">
+  <div class="container">
+    Built by <a href="https://github.com/icedsg" target="_blank" rel="noopener">icedsg</a> · MIT License ·
+    <a href="./demo.html">Demo</a>
+  </div>
+</footer>
+
+<script src="../src/mindkeeper-map.js"></script>
+<script src="./samples-data.js"></script>
+<script>
+var map = new MindkeeperMap('#chart', { layout: 'mindmap' }).init(MK_SAMPLES.portfolio);
+var layout = 'mindmap';
+function count() {
+  document.getElementById('count').textContent = MK_SAMPLES.count(MK_SAMPLES.portfolio) + ' people · ' + map.getLinks().length + ' links';
+}
+count();
+map.on('linkAdd', count);
+document.getElementById('btn-layout').onclick = function () {
+  layout = layout === 'orgchart' ? 'mindmap' : 'orgchart';
+  map.setLayout(layout);
+  this.textContent = layout === 'orgchart' ? 'Show as mind map' : 'Show as org chart';
+};
+document.getElementById('btn-link').onclick = function () {
+  map.addLink('pf-rhea', 'routes', 'investor');
+  this.disabled = true;
+};
+document.getElementById('btn-svg').onclick = function () { map.exportSVG('harbor-portfolio.svg'); };
+</script>
+
+</body>
+</html>
